@@ -56,7 +56,7 @@ getBoard isplayerOne handle = do
     sendToClient (GetShips isplayerOne) handle
     response <- getFromClient handle
     case response of
-        Nothing -> error "todo"
+        Nothing -> error "Invalid api call to Server. Expecting SetShips call."
         Just (SetShips s) -> pure (Board s [])
 
 makeInitialGameState :: Player -> Player -> GameState

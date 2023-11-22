@@ -37,7 +37,7 @@ isPlayerOne :: Server -> IO Bool
 isPlayerOne handle = do
     response <- getFromServer handle
     case response of
-        Nothing -> error "todo"
+        Nothing -> error "Invalid api call to client. Expecting getShips call."
         Just (GetShips b) -> pure b
 
 getOpponentShips :: Server -> IO [Ship]
@@ -45,7 +45,7 @@ getOpponentShips h =
     do
         response <- getFromServer h
         case response of
-            Nothing -> error "todo"
+            Nothing -> error "Invalid api call to client. Expecting getOpponentShips call."
             Just (SendShips s) -> pure s
 
 getGameStateUpdate :: Server -> IO (Cell, GameTurn)
@@ -53,15 +53,21 @@ getGameStateUpdate h =
     do
         response <- getFromServer h
         case response of
-            Nothing -> error "todo"
+            Nothing -> error "Invalid api call to client. Expecting getServerStatusUpdate call."
             Just (ServerStateUpdate c t) -> pure (c, t)
 
+sendGameStateUpdate :: Server -> Cell -> GameTurn -> IO ()
+sendGameStateUpdate s c t = sendToServer (ClientStateUpdate c t) s
+
+-- Interact with the view
 getShipsFromClient :: IO [Ship]
 getShipsFromClient = error "todo"
 
+-- Interact with the view
 getCellFromClient :: IO Cell
 getCellFromClient = error "todo"
 
+-- Interact with the view
 showClient :: LocalGameState -> IO ()
 showClient gs = error "todo"
 

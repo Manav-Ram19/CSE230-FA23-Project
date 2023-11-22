@@ -10,9 +10,10 @@ startBattleShipClient h = do
 clientGameLoop :: LocalGameState -> Server -> IO LocalGameState
 clientGameLoop gs@(LocalGameState myb ob isP1 turn) server
     | (isP1 && (turn == Player1)) || (not isP1 && (turn == Player2)) = do
-        (b1, b2, newTurn) <- playTurn myb ob turn
+        (attackCell, b1, b2, newTurn) <- playTurn myb ob turn
         let newGs = LocalGameState b1 b2 isP1 newTurn
         showClient newGs
+        sendGameStateUpdate server attackCell newTurn
         clientGameLoop newGs server
     | turn == GameOver = do
         showClient gs
@@ -29,14 +30,14 @@ opponentTurn server myb opb = do
     let myNewBoard = Board (ships myb) (myAttackedCell : attackedCells myb)
     pure (myNewBoard, opb, turnUpdateFromOpponent)
 
-playTurn :: Board -> Board -> GameTurn -> IO (Board, Board, GameTurn)
+playTurn :: Board -> Board -> GameTurn -> IO (Cell, Board, Board, GameTurn)
 playTurn myb opb curTurn = do
     attackCell <- getAttackFromPlayer opb
     let isHit = checkForCollision attackCell (ships opb)
     let newAttackedCells = attackCell: attackedCells opb
     let isGameOver = checkIfPlayerWon newAttackedCells (ships opb)
     let newOpB = Board (ships opb) newAttackedCells
-    pure (myb, newOpB, findNextGameTurn isHit isGameOver curTurn)
+    pure (attackCell, myb, newOpB, findNextGameTurn isHit isGameOver curTurn)
 
 checkIfPlayerWon :: [Cell] -> [Ship] -> Bool
 checkIfPlayerWon attackedCells ships = isSubset (concat ships) attackedCells
