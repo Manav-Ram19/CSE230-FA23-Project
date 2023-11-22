@@ -12,7 +12,7 @@ This project aims to build a Networked Application to play the popular two playe
 ## Battleship
 Battleship is a two-player strategy game, wherein players compete to be the first to find and destroy their opponent's ships hidden in a 2D game board. Players take turns guessing positions on the opponent's board, until one of the players has revealed all of their ships' cells, making their opponent the winner of the game.
 
-![Battleship](/Images/Battleship.jpeg)
+![Battleship](/Assets/Battleship.jpeg)
 
 (Source: [Source](https://www.ubisoft.com/en-us/game/battleship/battleship))
 
