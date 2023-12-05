@@ -80,7 +80,7 @@ To provide better performance, and simplicity, our client executables house the 
 
 Our Client executable is built on top of the following modules:
 1. [Client Socket](ClientInfra.hs) - Builds on top of the [Network.Socket](https://hackage.haskell.org/package/network-2.3/docs/Network-Socket.html) library to provide a cleaner interface for creating a socket, as well as sending and receiving networked messages for a client use-case.
-2. [Game Client](GameServer.hs) - Acts as the presenter layer of our server architecture by providing APIs to read and write messages to servers over the above server socket module. This layer also abstracts away the View/Display from the game logic.
+2. [Game Client](GameServer.hs) - Acts as the presenter layer of our client architecture by providing APIs to read and write messages to servers over the above server socket module. This layer also abstracts away the View/Display from the game logic.
 3. [Client Game Logic](BattleShipClientLoop.hs) - Implements the actual game logic maintained by the client to either request the player for a move, or to wait for a game update from the opponent (received through the server).
 4. Game Display (Todo) - Acts as the view for the player by utilizing the current client's local game state to display relevant information to the player. WE will be utilizing [brick](https://hackage.haskell.org/package/brick) in this layer of our architecture.
 
