@@ -49,3 +49,55 @@ A player wins if all of their opponent's ships get revelead before theirs.
 3. Implement the Model layer of our architecture to house game logic, maintain game state and determine win conditions.
 4. Develop and iterate on a simple but elegant UI for the application.
 5. Implement reach goals as time persists.
+
+## Architecture
+Our Game consists of a client executable that users interact with to play against each other, and a server executable that facilitates communication between game clients.
+
+![GamePlay](/Assets/GameExperience.png)
+
+The client and server executables are built on top of the [Network.Socket](https://hackage.haskell.org/package/network-2.3/docs/Network-Socket.html) networking library, and are described below:
+
+![GameArchitecture](/Assets/GameArchitecture.jpeg)
+
+We define the following terms:
+1. Game State - The current state of the game, involving information related to locations of both user's ships, locations of both user's attacks and whether the game is complete or if a specific player needs to play their turn.
+2. Game State Update - Any changes made by one player to the game state, through making a move.
+
+### Server Architecture
+> Facilitates game state replication
+
+Our server simply acts as a router between the two game clients of the two players playing against each other. The server receives game state updates from each client and forwards it to the other client until it has received a game state update informing it that the game is over. The server then closes the connections with both of the clients, and ends the thread handling the game.
+
+Our Server executable is built on top of the following modules:
+1. [Server Socket](ServerInfra.hs) - Builds on top of the [Network.Socket](https://hackage.haskell.org/package/network-2.3/docs/Network-Socket.html) library to provide a cleaner interface for creating a socket, as well as sending and receiving networked messages for a server use-case.
+2. [Game Server](GameServer.hs) - Acts as the presenter layer of our server architecture by providing APIs to read and write messages to clients over the above server socket module.
+3. [Server Game Logic](BattleShipServerLoop.hs) - Implements the actual game logic maintained by the server to decide the current player's turn and forward game updates between players. This module also determines when a game has ended, so that the presenter layer can end the connections.
+
+### Client Architecture
+> Houses the core game logic
+
+To provide better performance, and simplicity, our client executables house the core game logic. Game Clients determine if it is its user's turn and prompt's the user to make a move, or if it is the opponent's turn and waits to receive a game state update from the opponent. By combining game state updates with their locally maintained game state, both game clients are able to rebuild the current game state to remain in coordination with each other.
+
+Our Client executable is built on top of the following modules:
+1. [Client Socket](ClientInfra.hs) - Builds on top of the [Network.Socket](https://hackage.haskell.org/package/network-2.3/docs/Network-Socket.html) library to provide a cleaner interface for creating a socket, as well as sending and receiving networked messages for a client use-case.
+2. [Game Client](GameServer.hs) - Acts as the presenter layer of our server architecture by providing APIs to read and write messages to servers over the above server socket module. This layer also abstracts away the View/Display from the game logic.
+3. [Client Game Logic](BattleShipClientLoop.hs) - Implements the actual game logic maintained by the client to either request the player for a move, or to wait for a game update from the opponent (received through the server).
+4. Game Display (Todo) - Acts as the view for the player by utilizing the current client's local game state to display relevant information to the player. WE will be utilizing [brick](https://hackage.haskell.org/package/brick) in this layer of our architecture.
+
+### Shared Resources
+> Raw data types shared between client and server implementations
+
+The following Raw types and methods are shared between our server and client executables:
+1. [Game Types](Types.hs) - Raw data types to represent game boards, ships, cells, etc.
+2. [Server Messages](ServerMessages.hs) - Provides "APIs" in the form of messages that are sent by the server, as well as encoding and decoding apis, to write and read these messages into a form supported by the lower level network sockets.
+3. [Client Messages](ClientMessages.hs) - Provides "APIs" in the form of messages that are sent by the client, as well as encoding and decoding apis, to write and read these messages into a form supported by the lower level network sockets.
+
+## Challenges
+
+We had two main challenges until now:
+1. Game Architecture - We were unsure whether the game logic should be maintained by the server, the client or both, as each approach provided its own set of advantages and disadvantages. Ultimately we ended up housing the core game logic in the client to ensure reliablility and low latency for users. Further, this also allows for scalability since our server now only acts as a simple state replication router, and can thus support more requests and games concurrently.
+2. Networking Interface - The networking interface in haskell seemed a lot more complex than we had expected, and our project required us to be able to develop a reliable networking interface to prop up our game. We researched a lot about the networking libraries that we've used as well as understood the different use-cases, to finally implement this aspect of our project.
+
+## Development Status and Future Work
+
+We expect to be able to support all of our primary features and finish our main goals by the deadline.
