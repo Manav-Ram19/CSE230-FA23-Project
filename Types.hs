@@ -1,7 +1,7 @@
 module Types where
 import GHC.IO.Handle (Handle)
 
-data Cell = Cell Int Int deriving(Eq)
+data Cell = Cell Int Int deriving(Eq, Show)
 type Ship = [Cell]
 
 data Board = Board {
@@ -14,7 +14,7 @@ data Player = Player {
     board :: Board
 }
 
-data GameTurn = Player1 | Player2 | GameOver deriving(Eq)
+data GameTurn = Player1 | Player2 | GameOver deriving(Eq, Show)
 
 data GameState = GameState {
     player1 :: Player,
