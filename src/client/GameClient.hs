@@ -81,7 +81,7 @@ getCellFromClient = do
 showClient :: LocalGameState -> IO ()
 showClient gs = do
     let playerBoard = makeBoard False (myBoard gs)
-    let opponentBoard = makeBoard True (myBoard gs)
+    let opponentBoard = makeBoard True (oppBoard gs)
     putStrLn "Current Board:"
     let boardSep = "    |    "
     let outputList = addSep boardSep playerBoard opponentBoard

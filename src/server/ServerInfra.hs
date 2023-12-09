@@ -57,5 +57,4 @@ sendToClient s h = do
 getFromClient :: Handle -> IO (Maybe ClientMessages)
 getFromClient h = do
     s <- hGetLine h
-    putStrLn s
     pure (decodeClientMessage s)

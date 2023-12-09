@@ -62,9 +62,7 @@ makeInitialGameState p1 p2 = GameState p1 p2 Player1
 
 getGameUpdateFromPlayer :: Player -> IO (Cell, GameTurn)
 getGameUpdateFromPlayer p@(Player h _) = do
-    putStrLn "Getting Message from Client"
     clientMsg <- getFromClient h
-    putStrLn ("Client Message: " ++ show clientMsg)
     case clientMsg of
         Just (ClientStateUpdate c t) -> pure (c, t)
         _ -> error "Invalid message from client. Expecting cell."

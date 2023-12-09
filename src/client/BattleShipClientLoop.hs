@@ -16,18 +16,15 @@ startGame hostName = do
 clientGameLoop :: LocalGameState -> Server -> IO LocalGameState
 clientGameLoop gs@(LocalGameState myb ob isP1 turn) server
     | (isP1 && (turn == Player1)) || (not isP1 && (turn == Player2)) = do
-        putStrLn "My Turn"
         (attackCell, b1, b2, newTurn) <- playTurn myb ob turn
         let newGs = LocalGameState b1 b2 isP1 newTurn
         showClient newGs
         sendGameStateUpdate server attackCell newTurn
         clientGameLoop newGs server
     | turn == GameOver = do
-        putStrLn "Game Over"
         showClient gs
         pure gs
     | otherwise = do
-        putStrLn "Opponent Turn"
         (b1, b2, newTurn) <- opponentTurn server myb ob
         let newGs = LocalGameState b1 b2 isP1 newTurn
         showClient newGs
