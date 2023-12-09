@@ -7,6 +7,7 @@ module GameServer (
 import ServerInfra
 import GHC.IO.Handle
 import GHC.Conc
+import Control.Concurrent.Async
 import Types
 import ServerMessages
 import ClientMessages
@@ -32,16 +33,17 @@ validateAndStartGame gameloop players
 execGame :: GameLoopCallBack -> NewPlayer -> NewPlayer -> IO ()
 execGame gameloop p1Handle p2Handle = do
     -- Get players' boards
-    b1 <- getBoard True p1Handle -- TODO: Make these async calls
-    b2 <- getBoard False p2Handle -- TODO: Make these async calls
-    -- TODO: If using async approach, then wait for both players' boards to be resolved
+    b1Future <- async (getBoard True p1Handle)
+    b2Future <- async (getBoard False p2Handle)
+    b1 <- wait b1Future
+    b2 <- wait b2Future
     let p1 = Player p1Handle b1
     let p2 = Player p2Handle b2
     let gameState = makeInitialGameState p1 p2
-    -- TODO: Send opponent ship locations to both players
-    sendToClient (SendShips (ships (board p2))) (handle p1) -- TODO: Make these async calls
-    sendToClient (SendShips (ships (board p1))) (handle p2) -- TODO: Make these async calls
-    -- TODO: If using async approach, then wait for both players' boards to be resolved
+    p1Future <- async (sendToClient (SendShips (ships (board p2))) (handle p1))
+    p2Future <- async (sendToClient (SendShips (ships (board p1))) (handle p2))
+    wait p1Future
+    wait p2Future
     {- Run Game Loop -}
     _ <- gameloop gameState
     {- Winning state is resolved on both sides locally -}

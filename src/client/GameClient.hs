@@ -55,7 +55,8 @@ sendGameStateUpdate s c t = sendToServer (ClientStateUpdate c t) s
 {- Currently hardcoded to get game to run -}
 getShipsFromClient :: IO [Ship]
 getShipsFromClient = do
-    pure [[Cell 0 0, Cell 0 1], [Cell 2 2, Cell 3 2, Cell 4 2], [Cell 7 7, Cell 6 7, Cell 5 7], [Cell 3 4, Cell 3 5, Cell 3 6, Cell 3 7], [Cell 9 1, Cell 9 2, Cell 9 3, Cell 9 4, Cell 9 5]]
+    pure [[Cell 0 0]]
+    -- pure [[Cell 0 0, Cell 0 1], [Cell 2 2, Cell 3 2, Cell 4 2], [Cell 7 7, Cell 6 7, Cell 5 7], [Cell 3 4, Cell 3 5, Cell 3 6, Cell 3 7], [Cell 9 1, Cell 9 2, Cell 9 3, Cell 9 4, Cell 9 5]]
 
 -- TODO: Deprecate and Replace with Bricks
 -- Interact with the view
