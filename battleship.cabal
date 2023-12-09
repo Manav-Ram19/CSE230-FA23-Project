@@ -24,17 +24,17 @@ source-repository head
 executable client
   main-is: Main.hs
   other-modules:
+      ClientMessages
+      ServerMessages
       Types
       BattleShipClientLoop
       ClientInfra
-      ClientMessages
       ClientView
       GameClient
       BattleShipServerLoop
       GameServer
       GameServerConfig
       ServerInfra
-      ServerMessages
       Paths_battleship
   autogen-modules:
       Paths_battleship
@@ -53,17 +53,17 @@ executable client
 executable server
   main-is: Main.hs
   other-modules:
+      ClientMessages
+      ServerMessages
       Types
       BattleShipClientLoop
       ClientInfra
-      ClientMessages
       ClientView
       GameClient
       BattleShipServerLoop
       GameServer
       GameServerConfig
       ServerInfra
-      ServerMessages
       Paths_battleship
   autogen-modules:
       Paths_battleship
