@@ -9,10 +9,7 @@ data Board = Board {
     attackedCells :: [Cell]
 } deriving (Show)
 
-data Player = Player {
-    handle :: Handle,
-    board :: Board
-}
+type Player = Handle
 
 data GameTurn = Player1 | Player2 | GameOver deriving(Eq, Show, Read)
 

@@ -31,24 +31,22 @@ validateAndStartGame gameloop players
 
 
 execGame :: GameLoopCallBack -> NewPlayer -> NewPlayer -> IO ()
-execGame gameloop p1Handle p2Handle = do
+execGame gameloop p1 p2 = do
     -- Get players' boards
-    b1Future <- async (getBoard True p1Handle)
-    b2Future <- async (getBoard False p2Handle)
+    b1Future <- async (getBoard True p1)
+    b2Future <- async (getBoard False p2)
     b1 <- wait b1Future
     b2 <- wait b2Future
-    let p1 = Player p1Handle b1
-    let p2 = Player p2Handle b2
     let gameState = makeInitialGameState p1 p2
-    p1Future <- async (sendToClient (SendShips (ships (board p2))) (handle p1))
-    p2Future <- async (sendToClient (SendShips (ships (board p1))) (handle p2))
+    p1Future <- async (sendToClient (SendShips (ships b2)) p1)
+    p2Future <- async (sendToClient (SendShips (ships b1)) p2)
     wait p1Future
     wait p2Future
     {- Run Game Loop -}
     _ <- gameloop gameState
     {- Winning state is resolved on both sides locally -}
-    hClose (handle p1) -- Close connections since game is over
-    hClose (handle p2) -- Close connections since game is over
+    hClose p1 -- Close connections since game is over
+    hClose p2 -- Close connections since game is over
     {- Should we make these async calls? -}
 
 getBoard :: IsPlayerOne -> NewPlayer -> IO Board
@@ -63,12 +61,12 @@ makeInitialGameState :: Player -> Player -> GameState
 makeInitialGameState p1 p2 = GameState p1 p2 Player1
 
 getGameUpdateFromPlayer :: Player -> IO (Cell, GameTurn)
-getGameUpdateFromPlayer p@(Player h _) = do
-    clientMsg <- getFromClient h
+getGameUpdateFromPlayer playerHandle= do
+    clientMsg <- getFromClient playerHandle
     case clientMsg of
         Just (ClientStateUpdate c t) -> pure (c, t)
         _ -> error "Invalid message from client. Expecting cell."
 
 sendGameUpdateToPlayer :: Player -> Cell -> GameTurn -> IO ()
-sendGameUpdateToPlayer (Player h _) c t = do
-    sendToClient (ServerStateUpdate c t) h
+sendGameUpdateToPlayer playerHandle c t = do
+    sendToClient (ServerStateUpdate c t) playerHandle
