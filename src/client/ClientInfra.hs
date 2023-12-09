@@ -31,6 +31,4 @@ sendToServer s h = do
 getFromServer :: Handle -> IO (Maybe ServerMessage)
 getFromServer h = do
     s <- hGetLine h
-    case readMaybe s of
-        Nothing -> getFromServer h
-        Just str -> pure (decodeServerMessage str)
+    pure (decodeServerMessage s)

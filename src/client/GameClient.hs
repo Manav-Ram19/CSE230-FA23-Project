@@ -20,12 +20,15 @@ type ClientGameLoopCallBack = (LocalGameState -> Server -> IO LocalGameState)
 startGameClient :: ClientGameLoopCallBack -> HostName -> IO ()
 startGameClient callback h = do
     h <- initClientSocket h serverPort
+    putStrLn (show h)
     startGame callback h
     pure ()
 
 startGame :: ClientGameLoopCallBack -> Handle -> IO ()
 startGame callback h = do
+    putStrLn "WAITNING FOR P1 MESSAGE...."
     isP1 <- isPlayerOne h
+    putStrLn (show isP1)
     ships <- getShipsFromClient
     sendToServer (SetShips ships) h
     opponentShips <- getOpponentShips h
@@ -37,24 +40,27 @@ isPlayerOne :: Server -> IO Bool
 isPlayerOne handle = do
     response <- getFromServer handle
     case response of
-        Nothing -> error "Invalid api call to client. Expecting getShips call."
         Just (GetShips b) -> pure b
+        _ -> error "Invalid api call to client. Expecting getShips call."
+        
 
 getOpponentShips :: Server -> IO [Ship]
 getOpponentShips h =
     do
         response <- getFromServer h
         case response of
-            Nothing -> error "Invalid api call to client. Expecting getOpponentShips call."
             Just (SendShips s) -> pure s
+            _ -> error "Invalid api call to client. Expecting getOpponentShips call."
+            
 
 getGameStateUpdate :: Server -> IO (Cell, GameTurn)
 getGameStateUpdate h =
     do
         response <- getFromServer h
         case response of
-            Nothing -> error "Invalid api call to client. Expecting getServerStatusUpdate call."
             Just (ServerStateUpdate c t) -> pure (c, t)
+            _ -> error "Invalid api call to client. Expecting getServerStatusUpdate call."
+            
 
 sendGameStateUpdate :: Server -> Cell -> GameTurn -> IO ()
 sendGameStateUpdate s c t = sendToServer (ClientStateUpdate c t) s

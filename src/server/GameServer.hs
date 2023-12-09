@@ -33,6 +33,7 @@ validateAndStartGame gameloop players
 
 execGame :: GameLoopCallBack -> NewPlayer -> NewPlayer -> IO ()
 execGame gameloop p1Handle p2Handle = do
+    putStrLn "EXEC GAME CALLED"
     -- Get players' boards
     b1 <- getBoard True p1Handle -- TODO: Make these async calls
     b2 <- getBoard False p2Handle -- TODO: Make these async calls

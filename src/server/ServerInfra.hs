@@ -23,7 +23,9 @@ maxQueuedCons = 1024 -- TODO: Verify if this constant matters
 
 initServer :: Port -> NumBufferedConnectionsBeforeCallBack -> ConnectionCallBack -> IO ()
 initServer portNumberAsStr numBufferedConnectionsBeforeCallBack callBack = do
+    putStrLn "INIT SERVERRRR"
     sock <- createSocket portNumberAsStr
+    putStrLn (show sock)
     serverLoop sock numBufferedConnectionsBeforeCallBack callBack []
 
 createSocket :: Port -> IO Socket
@@ -38,10 +40,11 @@ createSocket portNumberAsStr = do
 serverLoop :: Socket -> NumBufferedConnectionsBeforeCallBack -> ConnectionCallBack -> [Handle] -> IO ()
 serverLoop serverSock numBufferedConnectionsBeforeCallBack callBack queuedConnections  = do
     (clientSock, clientAddr) <- accept serverSock
+    putStrLn "ACCEPTED"
     clientHandle <- socketToHandle clientSock ReadWriteMode
     hSetBuffering clientHandle LineBuffering
-    newQueuedConnections <- handleCallBack numBufferedConnectionsBeforeCallBack callBack (queuedConnections ++ [clientHandle])
-    serverLoop serverSock numBufferedConnectionsBeforeCallBack callBack newQueuedConnections
+    remainingQueuedConections <- handleCallBack numBufferedConnectionsBeforeCallBack callBack (queuedConnections ++ [clientHandle])
+    serverLoop serverSock numBufferedConnectionsBeforeCallBack callBack remainingQueuedConections
 
 handleCallBack :: NumBufferedConnectionsBeforeCallBack -> ConnectionCallBack -> [Handle] -> IO [Handle]
 handleCallBack numBufferedConnectionsBeforeCallBack callBack queuedConnections
@@ -57,6 +60,4 @@ sendToClient s h = do
 getFromClient :: Handle -> IO (Maybe ClientMessages)
 getFromClient h = do
     s <- hGetLine h
-    case readMaybe s of
-        Nothing -> getFromClient h
-        Just str -> pure (decodeClientMessage str)
+    pure (decodeClientMessage s)
