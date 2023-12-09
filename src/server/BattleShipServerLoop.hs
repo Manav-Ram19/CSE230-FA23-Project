@@ -1,7 +1,7 @@
-module BattleShipServerLoop where
+module BattleShipServerLoop (startBattleShipServer) where
+    
 import Types
 import GameServer
-import ServerMessages
 
 startBattleShipServer :: IO ()
 startBattleShipServer = do

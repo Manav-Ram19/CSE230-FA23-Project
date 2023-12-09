@@ -1,4 +1,5 @@
 module ClientInfra where
+
 import Network.Socket (HostName, AddrInfo (addrSocketType, addrFamily, addrAddress), getAddrInfo, defaultHints, SocketType (Stream), socket, setSocketOption, SocketOption (KeepAlive), connect, socketToHandle, Socket)
 import Types (Port)
 import Network.BSD

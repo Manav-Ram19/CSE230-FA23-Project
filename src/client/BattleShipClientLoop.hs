@@ -1,4 +1,5 @@
 module BattleShipClientLoop where
+    
 import Network.Socket
 import GameClient
 import Types
