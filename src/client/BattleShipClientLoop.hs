@@ -9,17 +9,23 @@ startBattleShipClient h = do
     startGameClient clientGameLoop h
 
 clientGameLoop :: LocalGameState -> Server -> IO LocalGameState
+clientGameLoop gs _ = do
+    putStrLn "Game Loop Executed"
+    pure gs
 clientGameLoop gs@(LocalGameState myb ob isP1 turn) server
     | (isP1 && (turn == Player1)) || (not isP1 && (turn == Player2)) = do
+        putStrLn "My Turn"
         (attackCell, b1, b2, newTurn) <- playTurn myb ob turn
         let newGs = LocalGameState b1 b2 isP1 newTurn
         showClient newGs
         sendGameStateUpdate server attackCell newTurn
         clientGameLoop newGs server
     | turn == GameOver = do
+        putStrLn "Game Over"
         showClient gs
         pure gs
     | otherwise = do
+        putStrLn "Opponent Turn"
         (b1, b2, newTurn) <- opponentTurn server myb ob
         let newGs = LocalGameState b1 b2 isP1 newTurn
         showClient newGs
@@ -41,10 +47,10 @@ playTurn myb opb curTurn = do
     pure (attackCell, myb, newOpB, findNextGameTurn isHit isGameOver curTurn)
 
 checkIfPlayerWon :: [Cell] -> [Ship] -> Bool
-checkIfPlayerWon attackedCells ships = isSubset (concat ships) attackedCells
+checkIfPlayerWon attackedcells opponentships = isSubset (concat opponentships) attackedcells
 
 checkForCollision :: Cell -> [Ship] -> Bool
-checkForCollision cell ships = isInList cell (concat ships)
+checkForCollision cell s = isInList cell (concat s)
 
 findNextGameTurn :: Bool -> Bool -> GameTurn -> GameTurn
 findNextGameTurn isHit isGameOver curTurn
@@ -61,7 +67,7 @@ getAttackFromPlayer opBoard = do
         else pure cell
 
 isCellChosenBefore :: Cell -> Board -> Bool
-isCellChosenBefore c b@(Board _ ac) = isInList c ac
+isCellChosenBefore c (Board _ ac) = isInList c ac
 
 isInList :: (Eq a) => a -> [a] -> Bool
 isInList x = foldr (\ y -> (||) (x == y)) False
@@ -69,6 +75,6 @@ isInList x = foldr (\ y -> (||) (x == y)) False
 isSubset :: (Eq a) => [a] -> [a] -> Bool
 isSubset [] _ = True
 isSubset _ [] = False
-isSubset xxs@(x:xs) yys@(y:ys) = if x == y then isSubset xs ys else isSubset xxs ys
+isSubset xxs@(x:xs) (y:ys) = if x == y then isSubset xs ys else isSubset xxs ys
 
 

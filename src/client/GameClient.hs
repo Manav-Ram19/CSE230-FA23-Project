@@ -21,27 +21,25 @@ type Server = Handle
 type ClientGameLoopCallBack = (LocalGameState -> Server -> IO LocalGameState)
 
 startGameClient :: ClientGameLoopCallBack -> HostName -> IO ()
-startGameClient callback h = do
-    h <- initClientSocket h serverPort
-    putStrLn (show h)
+startGameClient callback hostName = do
+    h <- initClientSocket hostName serverPort
     startGame callback h
     pure ()
 
 startGame :: ClientGameLoopCallBack -> Handle -> IO ()
 startGame callback h = do
-    putStrLn "WAITNING FOR P1 MESSAGE...."
     isP1 <- isPlayerOne h
-    putStrLn (show isP1)
-    ships <- getShipsFromClient
-    sendToServer (SetShips ships) h
+    playerShips <- getShipsFromClient
+    sendToServer (SetShips playerShips) h
     opponentShips <- getOpponentShips h
-    let localGameState = LocalGameState (Board ships []) (Board opponentShips []) isP1 Player1
-    let finalGameState = callback localGameState h
+    let localGameState = LocalGameState (Board playerShips []) (Board opponentShips []) isP1 Player1
+    showClient localGameState
+    let _ = callback localGameState h
     pure ()
 
 isPlayerOne :: Server -> IO Bool
-isPlayerOne handle = do
-    response <- getFromServer handle
+isPlayerOne serverHandle = do
+    response <- getFromServer serverHandle
     case response of
         Just (GetShips b) -> pure b
         _ -> error "Invalid api call to client. Expecting getShips call."
@@ -73,7 +71,7 @@ sendGameStateUpdate s c t = sendToServer (ClientStateUpdate c t) s
 {- Currently hardcoded to get game to run -}
 getShipsFromClient :: IO [Ship]
 getShipsFromClient = do
-    pure [[Cell 0 0, Cell 0 1], [Cell 2 2, Cell 2 3, Cell 2 4], [Cell 7 7, Cell 7 6, Cell 7 5], [Cell 3 3, Cell 3 4, Cell 3 5, Cell 3 6], [Cell 9 1, Cell 9 2, Cell 9 3, Cell 9 4, Cell 9 5]]
+    pure [[Cell 0 0, Cell 0 1], [Cell 2 2, Cell 3 2, Cell 4 2], [Cell 7 7, Cell 6 7, Cell 5 7], [Cell 3 4, Cell 3 5, Cell 3 6, Cell 3 7], [Cell 9 1, Cell 9 2, Cell 9 3, Cell 9 4, Cell 9 5]]
 
 -- TODO: Deprecate and Replace with Bricks
 -- Interact with the view
@@ -121,7 +119,7 @@ makeBoard isOpponentBoard b = boardWithAttacks
         addCellToBoard :: Char -> Cell -> [[Char]] -> [[Char]]
         addCellToBoard c (Cell row col) curBoard = modifyListAtInd row (modifyListAtInd col c (getElemAtInd row [] curBoard)) curBoard
         modifyListAtInd :: Int -> a -> [a] -> [a]
-        modifyListAtInd ind newVal oldList = take ind oldList ++ [newVal] ++ take (length oldList - ind) oldList
+        modifyListAtInd ind newVal oldList = take ind oldList ++ [newVal] ++ drop (ind+1) oldList
         getElemAtInd :: Int -> a -> [a] -> a
         getElemAtInd _ defaultVal [] = defaultVal
         getElemAtInd 0 _ l = head l
