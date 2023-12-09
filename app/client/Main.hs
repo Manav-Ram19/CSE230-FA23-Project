@@ -5,6 +5,6 @@ import BattleShipClientLoop
 
 
 main :: IO ()
-main = startBattleShipClient "127.0.0.1"
+main = startGame "127.0.0.1"
 
 

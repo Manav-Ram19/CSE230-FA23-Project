@@ -1,17 +1,19 @@
 module BattleShipClientLoop where
     
 import Network.Socket
+import GameServerConfig (serverPort)
 import GameClient
 import Types
+import ClientInfra (initClientSocket)
 
-startBattleShipClient :: HostName -> IO ()
-startBattleShipClient h = do
-    startGameClient clientGameLoop h
+startGame :: HostName -> IO ()
+startGame hostName = do
+    h <- initClientSocket hostName serverPort
+    igs <- getInitialGameState h
+    _ <- clientGameLoop igs h
+    pure ()
 
 clientGameLoop :: LocalGameState -> Server -> IO LocalGameState
-clientGameLoop gs _ = do
-    putStrLn "Game Loop Executed"
-    pure gs
 clientGameLoop gs@(LocalGameState myb ob isP1 turn) server
     | (isP1 && (turn == Player1)) || (not isP1 && (turn == Player2)) = do
         putStrLn "My Turn"

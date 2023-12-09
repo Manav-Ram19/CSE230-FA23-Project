@@ -23,3 +23,14 @@ data GameState = GameState {
 }
 
 type Port = String
+
+data LocalGameState = LocalGameState {
+    myBoard :: Board,
+    oppBoard :: Board,
+    amIP1 :: Bool,
+    turn :: GameTurn
+}
+
+type Server = Handle
+type ClientGameLoopCallBack = (LocalGameState -> Server -> IO LocalGameState)
+

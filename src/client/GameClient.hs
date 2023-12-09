@@ -10,32 +10,16 @@ import Types
 import ClientMessages
 import Text.Read (readMaybe)
 
-data LocalGameState = LocalGameState {
-    myBoard :: Board,
-    oppBoard :: Board,
-    amIP1 :: Bool,
-    gameTurn :: GameTurn
-}
 
-type Server = Handle
-type ClientGameLoopCallBack = (LocalGameState -> Server -> IO LocalGameState)
-
-startGameClient :: ClientGameLoopCallBack -> HostName -> IO ()
-startGameClient callback hostName = do
-    h <- initClientSocket hostName serverPort
-    startGame callback h
-    pure ()
-
-startGame :: ClientGameLoopCallBack -> Handle -> IO ()
-startGame callback h = do
+getInitialGameState :: Handle -> IO LocalGameState
+getInitialGameState h = do
     isP1 <- isPlayerOne h
     playerShips <- getShipsFromClient
     sendToServer (SetShips playerShips) h
     opponentShips <- getOpponentShips h
     let localGameState = LocalGameState (Board playerShips []) (Board opponentShips []) isP1 Player1
     showClient localGameState
-    let _ = callback localGameState h
-    pure ()
+    pure localGameState
 
 isPlayerOne :: Server -> IO Bool
 isPlayerOne serverHandle = do
