@@ -15,12 +15,20 @@ import Control.Concurrent (forkIO)
 import GHC.Conc (threadDelay)
 
 -------------------- TYPES --------------------
-data GameStateForUI = GameStateForUI
-  { localGameState :: LocalGameState,
-    currRow :: Int,
-    currCol :: Int
-  } | EndGameStateForUI {
-    didIWin :: Bool
+data GameStateForUI =
+  SetupGameStateForUI {
+    _setupships :: [Ship],
+    _setupserver :: Server,
+    _setupcurrRow :: Int,
+    _setupcurrCol :: Int
+  }
+  | GameStateForUI
+  { _localGameState :: LocalGameState,
+    _currRow :: Int,
+    _currCol :: Int
+  }
+  | EndGameStateForUI {
+    _didClientWin :: Bool
   }
 
 type Name = ()
@@ -69,6 +77,7 @@ drawGrid grid label hRowId hColId =
     gridWithColId = map (zip [0 .. numCols]) grid
 
 draw :: GameStateForUI -> [Widget a]
+draw (SetupGameStateForUI {}) = error "todo"
 draw (EndGameStateForUI isw) = [str $ endGameMessage isw]
   where
     endGameMessage True = "You Won!"
@@ -86,20 +95,20 @@ handleEvent (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt
 handleEvent (AppEvent RemoteStatusUpdate) = do
   currState <- get
   case currState of
-    EndGameStateForUI _ -> pure ()
     GameStateForUI lgs _ _ -> do
         unless (isMyTurn (amIP1 lgs) (turn lgs)) $ do
             uState <- liftIO (handleRemoteStatusUpdate currState)
             put uState
+    _ -> pure ()
 
 handleEvent e = do
   currState <- get
   case currState of
-    EndGameStateForUI _ -> pure ()
     GameStateForUI lgs _ _ -> do
       when (isMyTurn (amIP1 lgs) (turn lgs)) $ do
           uState <- liftIO (eventHandler e currState)
           put uState
+    _ -> pure ()
 
 eventHandler :: BrickEvent n e -> GameStateForUI -> IO GameStateForUI
 eventHandler _ egsui@(EndGameStateForUI _) = pure egsui
@@ -117,6 +126,7 @@ isMyTurn False Player2 = True
 isMyTurn _ _ = False
 
 -- uses direction to upate game state to move current highlighted cell
+-- TODO: Check why there is an extra row in output when moving highlight cell
 moveHighlight :: KeyDirection -> GameStateForUI -> GameStateForUI
 moveHighlight UI.Up (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((curRow + numRows - 1) `mod` numRows) curCol
 moveHighlight UI.Down (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((curRow + 1) `mod` numRows) curCol
@@ -125,7 +135,6 @@ moveHighlight UI.Right (GameStateForUI lgs curRow curCol) = GameStateForUI lgs c
 moveHighlight _ gs = gs
 
 handleEnter :: GameStateForUI -> IO GameStateForUI
-handleEnter gs@(EndGameStateForUI _) = pure gs
 handleEnter gs@(GameStateForUI lgs curRow curCol) = do
   if isCellChosenBefore (Cell curRow curCol) (oppBoard lgs)
     then pure gs
@@ -143,6 +152,7 @@ handleEnter gs@(GameStateForUI lgs curRow curCol) = do
                       _ -> GameStateForUI newgs curRow curCol
       sendGameStateUpdate (server newgs) attackCell newTurn
       pure newgsui
+handleEnter gs = pure gs
 
 isWinner :: LocalGameState -> Bool
 isWinner (LocalGameState _ opb _ GameOver _) = isSubset (concat $ ships opb) (attackedCells opb)
@@ -160,6 +170,7 @@ handleRemoteStatusUpdate (GameStateForUI lgs r c) = do
                       GameOver -> EndGameStateForUI (isWinner newLocalGameState)
                       _ -> GameStateForUI newLocalGameState r c
   pure newgsui
+handleRemoteStatusUpdate gs = pure gs
 
 -------------------- APP --------------------
 
