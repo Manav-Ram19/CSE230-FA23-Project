@@ -1,26 +1,16 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-
 module UI where
 
 import Types
-#if !(MIN_VERSION_base(4,11,0))
-import Data.Monoid ((<>))
-#endif
 
-import BattleShipClientLoop (checkForCollision, checkIfPlayerWon, findNextGameTurn, isCellChosenBefore)
+import BattleShipClientLoop (checkForCollision, checkIfPlayerWon, findNextGameTurn, isCellChosenBefore, isSubset)
 import Brick
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Center as C
-import qualified Brick.Widgets.Edit as E
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import GameClient (isPlayerOne, sendGameStateUpdate, getGameStateUpdate)
+import GameClient (sendGameStateUpdate, getGameStateUpdate)
 import qualified Graphics.Vty as V
-import Graphics.Vty.Attributes
-import qualified Types
 import Brick.BChan (newBChan, writeBChan)
-import Control.Monad (forever)
+import Control.Monad (forever, when, unless)
 import Control.Concurrent (forkIO)
 import GHC.Conc (threadDelay)
 
@@ -29,6 +19,8 @@ data GameStateForUI = GameStateForUI
   { localGameState :: LocalGameState,
     currRow :: Int,
     currCol :: Int
+  } | EndGameStateForUI {
+    didIWin :: Bool
   }
 
 type Name = ()
@@ -69,14 +61,18 @@ drawGrid grid label hRowId hColId =
     vBox $
       map (hBox . map drawCell) gridWithHighLightBool
   where
-    gridWithHighLightBool = map (\row -> convertRow row) gridWithRowId
+    gridWithHighLightBool = map convertRow gridWithRowId
     convertRow :: (Int, [(Int, Char)]) -> [(Char, Bool)]
-    convertRow (rowId, []) = []
-    convertRow (rowId, (colId, c) : ls) = (if rowId == hRowId && colId == hColId then (c, True) else (c, False)) : (convertRow (rowId, ls))
+    convertRow (_, []) = []
+    convertRow (rowId, (colId, c) : ls) = (if rowId == hRowId && colId == hColId then (c, True) else (c, False)) : convertRow (rowId, ls)
     gridWithRowId = zip [0 .. numRows] gridWithColId
-    gridWithColId = map (\row -> zip ([0 .. numCols]) (row)) grid
+    gridWithColId = map (zip [0 .. numCols]) grid
 
 draw :: GameStateForUI -> [Widget a]
+draw (EndGameStateForUI isw) = [str $ endGameMessage isw]
+  where
+    endGameMessage True = "You Won!"
+    endGameMessage False = "You Lost."
 draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ C.hCenter grid]
   where
     grid = hBox [drawGrid mb "My Board" (-1) (-1), drawGrid ob "Opponents Board" curRow curCol]
@@ -89,32 +85,31 @@ handleEvent :: BrickEvent Name RemoteStatusUpdate -> EventM n GameStateForUI ()
 handleEvent (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt
 handleEvent (AppEvent RemoteStatusUpdate) = do
   currState <- get
-  let lgs = (localGameState currState)
-  if (not (isMyTurn (amIP1 lgs) (turn lgs)))
-    then do 
-      uState <- liftIO (handleRemoteStatusUpdate currState)
-      put uState 
-  else pure()
+  case currState of
+    EndGameStateForUI _ -> pure ()
+    GameStateForUI lgs _ _ -> do
+        unless (isMyTurn (amIP1 lgs) (turn lgs)) $ do
+            uState <- liftIO (handleRemoteStatusUpdate currState)
+            put uState
 
 handleEvent e = do
   currState <- get
-  let lgs = (localGameState currState)
-  if (isMyTurn (amIP1 lgs) (turn lgs))
-    then do
-      uState <- liftIO (eventHandler e currState)
-      put uState
-    else pure ()
+  case currState of
+    EndGameStateForUI _ -> pure ()
+    GameStateForUI lgs _ _ -> do
+      when (isMyTurn (amIP1 lgs) (turn lgs)) $ do
+          uState <- liftIO (eventHandler e currState)
+          put uState
 
-handleEvent _ = pure ()
-
-eventHandler :: BrickEvent n e -> GameStateForUI -> IO (GameStateForUI)
+eventHandler :: BrickEvent n e -> GameStateForUI -> IO GameStateForUI
+eventHandler _ egsui@(EndGameStateForUI _) = pure egsui
 eventHandler (VtyEvent (V.EvKey V.KUp [])) gsui    = pure (moveHighlight UI.Up gsui)
 eventHandler (VtyEvent (V.EvKey V.KDown [])) gsui  = pure (moveHighlight UI.Down gsui)
 eventHandler (VtyEvent (V.EvKey V.KLeft [])) gsui  = pure (moveHighlight UI.Left gsui)
 eventHandler (VtyEvent (V.EvKey V.KRight [])) gsui = pure (moveHighlight UI.Right gsui)
 eventHandler (VtyEvent (V.EvKey V.KEnter [])) gsui = handleEnter gsui
 
-eventHandler _ gsui = pure(gsui)
+eventHandler _ gsui = pure gsui
 
 isMyTurn :: Bool -> GameTurn -> Bool
 isMyTurn True Player1 = True
@@ -127,32 +122,44 @@ moveHighlight UI.Up (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((cu
 moveHighlight UI.Down (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((curRow + 1) `mod` numRows) curCol
 moveHighlight UI.Left (GameStateForUI lgs curRow curCol) = GameStateForUI lgs curRow ((curCol + numCols - 1) `mod` numCols)
 moveHighlight UI.Right (GameStateForUI lgs curRow curCol) = GameStateForUI lgs curRow ((curCol + 1) `mod` numCols)
+moveHighlight _ gs = gs
 
-handleEnter :: GameStateForUI -> IO (GameStateForUI)
+handleEnter :: GameStateForUI -> IO GameStateForUI
+handleEnter gs@(EndGameStateForUI _) = pure gs
 handleEnter gs@(GameStateForUI lgs curRow curCol) = do
   if isCellChosenBefore (Cell curRow curCol) (oppBoard lgs)
-    then pure (gs)
+    then pure gs
     else do
       let attackCell = Cell curRow curCol
-      let opponentBoard = (oppBoard lgs)
+      let opponentBoard = oppBoard lgs
       let isHit = checkForCollision attackCell (ships opponentBoard)
       let newAttackedCells = attackCell : attackedCells opponentBoard
       let isGameOver = checkIfPlayerWon newAttackedCells (ships opponentBoard)
       let newOpBoard = Board (ships opponentBoard) newAttackedCells
-      let newTurn = (findNextGameTurn isHit isGameOver (turn lgs))
+      let newTurn = findNextGameTurn isHit isGameOver (turn lgs)
       let newgs = LocalGameState (myBoard lgs) newOpBoard (amIP1 lgs) newTurn (server lgs)
-      let newgsui = GameStateForUI newgs curRow curCol
+      let newgsui = case newTurn of
+                      GameOver -> EndGameStateForUI (isWinner newgs)
+                      _ -> GameStateForUI newgs curRow curCol
       sendGameStateUpdate (server newgs) attackCell newTurn
-      pure (newgsui)
+      pure newgsui
+
+isWinner :: LocalGameState -> Bool
+isWinner (LocalGameState _ opb _ GameOver _) = isSubset (concat $ ships opb) (attackedCells opb)
+isWinner _ = False
 
 handleRemoteStatusUpdate :: GameStateForUI -> IO GameStateForUI
-handleRemoteStatusUpdate (GameStateForUI lgs r c) = do 
-  let s = (server lgs)
-  let myb = (myBoard lgs)
+handleRemoteStatusUpdate gs@(EndGameStateForUI _) = pure gs
+handleRemoteStatusUpdate (GameStateForUI lgs r c) = do
+  let s = server lgs
+  let myb = myBoard lgs
   (myAttackedCell, turnUpdateFromOpponent) <- getGameStateUpdate s
   let myNewBoard = Board (ships myb) (myAttackedCell : attackedCells myb)
   let newLocalGameState = LocalGameState myNewBoard (oppBoard lgs) (amIP1 lgs) turnUpdateFromOpponent (server lgs)
-  pure (GameStateForUI newLocalGameState r c)
+  let newgsui = case turnUpdateFromOpponent of
+                      GameOver -> EndGameStateForUI (isWinner newLocalGameState)
+                      _ -> GameStateForUI newLocalGameState r c
+  pure newgsui
 
 -------------------- APP --------------------
 
@@ -177,7 +184,7 @@ startUI lgs = do
   chan <- newBChan 10
   _ <- forkIO $ forever $ do
     writeBChan chan RemoteStatusUpdate
-    threadDelay 100000 
-  
-  f' <- customMain initialVty builder (Just chan) app (getInitalState lgs)
+    threadDelay 100000
+
+  _ <- customMain initialVty builder (Just chan) app (getInitalState lgs)
   putStrLn ""
