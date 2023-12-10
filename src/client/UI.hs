@@ -75,15 +75,17 @@ drawGrid :: [[Char]] -> String -> Int -> Int -> Widget n
 drawGrid grid label hRowId hColId = B.borderWithLabel (str label) $
     vBox $ map (hBox . map drawCell) gridWithHighLightBool
     where
-      gridWithHighLightBool = map (\row -> map tmp row) gridWithRowId
-      tmp (rowId, (colId, c)) = if rowId == hRowId && colId == hColId then (c, True) else (c, False)
-      gridWithRowId = map (\row -> zip ([0..numRows]) (row)) gridWithColId
-      gridWithColId = map (\row -> zip ([0..numRows]) (row)) grid
+      gridWithHighLightBool = map (\row -> convertRow row) gridWithRowId
+      convertRow ::  (Int, [(Int, Char)]) -> [(Char, Bool)]
+      convertRow (rowId, []) = []
+      convertRow (rowId, (colId,c):ls) = (if rowId == hRowId && colId == hColId then (c, True) else (c, False)):(convertRow (rowId, ls))
+      gridWithRowId = zip [0..numRows] gridWithColId
+      gridWithColId = map (\row -> zip ([0..numCols]) (row)) grid
 
 draw :: GameStateForUI  -> [Widget a]
 draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ C.hCenter grid]
   where
-    grid = hBox[drawGrid mb "My Board" curRow curCol, drawGrid ob "Opponents Board" (-1) (-1)] 
+    grid = hBox[drawGrid mb "My Board" (-1) (-1), drawGrid ob "Opponents Board" curRow curCol] 
     mb = makeBoard (myBoard lgs) False
     ob = makeBoard (oppBoard lgs) True
 
