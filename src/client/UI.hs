@@ -64,11 +64,11 @@ makeBoard b isOpponentBoard = boardWithAttacks
         getElemAtInd n defaultVal (_:ls) = getElemAtInd (n-1) defaultVal ls
 
 -- uses direction to upate game state to move current highlighted cell
-moveHighlight :: GameStateForUI -> KeyDirection -> GameStateForUI
-moveHighlight (GameStateForUI lgs curRow curCol) UI.Up   = GameStateForUI lgs ((curRow + numRows - 1) `mod` numRows) curCol
-moveHighlight (GameStateForUI lgs curRow curCol) UI.Down = GameStateForUI lgs ((curRow + 1) `mod` numRows) curCol 
-moveHighlight (GameStateForUI lgs curRow curCol) UI.Left = GameStateForUI lgs curRow ((curCol + numCols - 1) `mod` numCols) 
-moveHighlight (GameStateForUI lgs curRow curCol) UI.Right = GameStateForUI lgs curRow ((curCol + 1) `mod` numCols)
+moveHighlight ::  KeyDirection -> GameStateForUI -> GameStateForUI
+moveHighlight UI.Up (GameStateForUI lgs curRow curCol)    = GameStateForUI lgs ((curRow + numRows - 1) `mod` numRows) curCol
+moveHighlight UI.Down  (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((curRow + 1) `mod` numRows) curCol 
+moveHighlight UI.Left (GameStateForUI lgs curRow curCol)  = GameStateForUI lgs curRow ((curCol + numCols - 1) `mod` numCols) 
+moveHighlight UI.Right (GameStateForUI lgs curRow curCol)  = GameStateForUI lgs curRow ((curCol + 1) `mod` numCols)
 
 
 drawGrid :: [[Char]] -> String -> Int -> Int -> Widget n
@@ -90,7 +90,12 @@ draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ C.hCenter grid]
 -------------------- EVENTS -------------------
 
 handleEvent :: BrickEvent n e -> EventM n GameStateForUI()
-handleEvent _ = pure ()
+handleEvent (VtyEvent (V.EvKey (V.KChar 'q') []))   = halt
+handleEvent (VtyEvent (V.EvKey V.KUp         []))   = modify $ moveHighlight UI.Up 
+handleEvent (VtyEvent (V.EvKey V.KDown       []))   = modify $ moveHighlight UI.Down 
+handleEvent (VtyEvent (V.EvKey V.KLeft       []))   = modify $ moveHighlight UI.Left
+handleEvent (VtyEvent (V.EvKey V.KRight       []))   = modify $ moveHighlight UI.Right
+handleEvent _ = pure () 
 
 
 -------------------- APP --------------------
