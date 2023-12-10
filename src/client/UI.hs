@@ -35,18 +35,24 @@ type Name = ()
 
 data KeyDirection = Left | Right | Up | Down
 
-theMap :: AttrMap
-theMap =
-  attrMap
-    V.defAttr
-    []
+-- theMap :: AttrMap
+-- theMap =
+--   attrMap
+--     V.defAttr
+--     []
+
+myattrApp :: AttrMap
+myattrApp = attrMap (white `on` black) [ (attrName "highlight", fg yellow)
+                                      , (attrName "warning", bg magenta)
+                                      , (attrName "good", white `on` green) ]
 
 data RemoteStatusUpdate = RemoteStatusUpdate
 
 -------------------- DRAWS --------------------
+
 drawCell :: (Char, Bool) -> Widget n
 drawCell (c, highlighted) =
-  if highlighted then str (" " ++ "D" ++ " ") else str (" " ++ [c] ++ " ")
+  if highlighted then withAttr (attrName "warning") (str (" " ++ "D" ++ " ")) else str (" " ++ [c] ++ " ")
 
 makeBoard :: Board -> Bool -> [[Char]]
 makeBoard b isOpponentBoard = boardWithAttacks
@@ -163,7 +169,7 @@ app =
       appChooseCursor = neverShowCursor,
       appHandleEvent = handleEvent,
       appStartEvent = pure (),
-      appAttrMap = const theMap
+      appAttrMap = const myattrApp
     }
 
 getInitalState :: LocalGameState -> GameStateForUI
