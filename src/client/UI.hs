@@ -18,126 +18,103 @@ import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Center as C
 import qualified Brick.Widgets.Edit as E
 import qualified Graphics.Vty as V
+import Graphics.Vty.Attributes
 
 -------------------- TYPES --------------------
-data ResourceNames
-  = RowField
-  | ColField
-  deriving (Eq, Ord, Show)
-
-data RowColFormState = RowColFormState
-  { _row :: Int,
-    _col :: Int
-  }
-  deriving (Show)
-
-makeLenses ''RowColFormState
-
 data GameStateForUI = GameStateForUI
-  { localGameState :: LocalGameState,
-    rowColFormState :: RowColFormState
-  } deriving (Show)
+  {
+    localGameState :: LocalGameState, 
+    currRow :: Int, 
+    currCol :: Int
+  }
+
+type Name = ()
+
+data KeyDirection = Left | Right | Up | Down
 
 theMap :: AttrMap
 theMap =
   attrMap
     V.defAttr
-    [ (E.editAttr, V.white `on` V.black),
-      (E.editFocusedAttr, V.black `on` V.yellow),
-      (invalidFormInputAttr, V.white `on` V.red),
-      (focusedFormInputAttr, V.black `on` V.yellow)
-    ]
+    []
+
 
 -------------------- DRAWS --------------------
 
-drawCell :: Char -> Widget n
-drawCell c = str [' ',c, ' ']
+
+drawCell :: Char -> Bool -> Widget n
+drawCell c highlighted = 
+    if highlighted then str (" " + "D" + " ") else str (" " + [c] + " ")
+
+
+makeBoard :: Board -> Bool -> [[Char]]
+makeBoard b isOpponentBoard = boardWithAttacks
+    where
+        boardWithAttacks = foldr (addCellToBoard 'x') (if isOpponentBoard then newBoard else boardWithPlayerShips) (attackedCells b)
+        boardWithPlayerShips = foldr (addCellToBoard 's') newBoard (concat (ships b))
+        newBoard = replicate 10 (replicate 10 '.')
+        addCellToBoard :: Char -> Cell -> [[Char]] -> [[Char]]
+        addCellToBoard c (Cell row col) curBoard = modifyListAtInd row (modifyListAtInd col c (getElemAtInd row [] curBoard)) curBoard
+        modifyListAtInd :: Int -> a -> [a] -> [a]
+        modifyListAtInd ind newVal oldList = take ind oldList ++ [newVal] ++ drop (ind+1) oldList
+        getElemAtInd :: Int -> a -> [a] -> a
+        getElemAtInd _ defaultVal [] = defaultVal
+        getElemAtInd 0 _ l = head l
+        getElemAtInd n defaultVal (_:ls) = getElemAtInd (n-1) defaultVal ls
+
+-- uses direction to upate game state to move current highlighted cell
+moveHighlight :: GameStateForUI -> KeyDirection -> GameStateForUI
+moveHighlight (GameStateForUI lgs curRow curCol) UI.Up   = GameStateForUI lgs ((curRow + numRows - 1) `mod` numRows) curCol
+moveHighlight (GameStateForUI lgs curRow curCol) UI.Down = GameStateForUI lgs ((curRow + 1) `mod` numRows) curCol 
+moveHighlight (GameStateForUI lgs curRow curCol) UI.Left = GameStateForUI lgs curRow ((curCol + numCols - 1) `mod` numCols) 
+moveHighlight (GameStateForUI lgs curRow curCol) UI.Right = GameStateForUI lgs curRow ((curCol + 1) `mod` numCols)
+
 
 drawGrid :: [[Char]] -> String -> Widget n
 drawGrid grid label = B.borderWithLabel (str label) $
     vBox $ map (hBox . map drawCell) grid
 
-mkForm :: RowColFormState -> Form RowColFormState e ResourceNames
-mkForm =
-  let label s w =
-        padBottom (Pad 1) $
-          (vLimit 1 $ hLimit 10 $ str s <+> fill ' ') <+> w
-   in newForm
-        [ label "Row"
-            @@= editShowableField row RowField,
-          label "Col"
-            @@= editShowableField col ColField
-        ]
-
-
-draw :: GameStateForUI  -> [Widget ResourceNames]
-draw st = [C.vCenter $ C.hCenter grid <=> C.hCenter form <=> C.hCenter help]
+draw :: GameStateForUI  -> [Widget a]
+draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ C.hCenter grid]
   where
-    grid = hBox[drawGrid (replicate 10 (replicate 10 '.')) "My Board", drawGrid (replicate 10 (replicate 10 'X')) "Opponents Board"] 
-    form = B.border $ padTop (Pad 1) $ hLimit 20 $ renderForm (mkForm (rowColFormState st))
-    help = padTop (Pad 1) $ B.borderWithLabel (str "Help") body
-    body = str $ "Enter the Row and Col of where you want to hit\n" 
--- draw :: Form RowColFormState e ResourceNames -> [Widget ResourceNames]
--- draw f = [C.vCenter $ C.hCenter grid <=> C.hCenter form <=> C.hCenter help]
---   where
---     grid = hBox[drawGrid (replicate 10 (replicate 10 '.')) "My Board", drawGrid (replicate 10 (replicate 10 'X')) "Opponents Board"] 
---     form = B.border $ padTop (Pad 1) $ hLimit 20 $ renderForm (mkForm f)
---     help = padTop (Pad 1) $ B.borderWithLabel (str "Help") body
---     body = str $ "Enter the Row and Col of where you want to hit\n"
-
+    grid = hBox[drawGrid mb "My Board", drawGrid ob "Opponents Board"] 
+    mb = makeBoard (myBoard lgs) False
+    ob = makeBoard (oppBoard lgs) True
 
 -------------------- EVENTS -------------------
 
+handleEvent :: BrickEvent n e -> EventM n GameStateForUI()
+handleEvent _ = pure ()
 
 
 -------------------- APP --------------------
 
-app :: App GameStateForUI e ResourceNames
-app =
-  App
-    { appDraw = draw,
-      appHandleEvent = handleEvent,
-      -- appHandleEvent = \ev -> do
-      --   f <- gets formFocus
-      --   case ev of
-      --     VtyEvent (V.EvResize {}) -> return ()
-      --     VtyEvent (V.EvKey V.KEsc []) -> halt
-      --     _ -> do
-      --       handleFormEvent ev
+app :: App GameStateForUI e Name 
+app = App { appDraw = draw
+                  , appChooseCursor = neverShowCursor
+                  , appHandleEvent = handleEvent
+                  , appStartEvent = pure() 
+                  , appAttrMap = const theMap
+                  }
 
-      --       -- Example of external validation:
-      --       st <- gets formState
-      --       modify $ setFieldValid (st ^. row >= 0) RowField,
-      appChooseCursor = focusRingCursor formFocus (mkForm (rowColFormState st)),
-      appStartEvent = return (),
-      appAttrMap = const theMap
-    }
-
-handleEvent :: BrickEvent ResourceNames e -> EventM ResourceNames GameStateForUI ()
-handleEvent n  = halt
+-- handleEvent :: BrickEvent ResourceNames e -> EventM ResourceNames GameStateForUI ()
+-- handleEvent n  = halt
 
 getInitalState :: GameStateForUI
 getInitalState = 
-  GameStateForUI localGameState initialForm 
+  GameStateForUI localGameState 1 1 
   where 
-    initialForm = RowColFormState
-          { _row = 1,
-            _col = 1
-          }  
     localGameState = LocalGameState (Board []  []) (Board [] []) False Player1 
 
 
 _main :: IO ()
 _main = do
-  let buildVty = do
-        v <- V.mkVty V.defaultConfig
-        V.setMode (V.outputIface v) V.Mouse True
-        return v
+  let builder = V.mkVty V.defaultConfig
       
 
-  initialVty <- buildVty
-  f' <- customMain initialVty buildVty Nothing app getInitalState
-  print $ f'
+  initialVty <- builder
+  f' <- customMain initialVty builder Nothing app getInitalState
+  putStrLn "esdjklfsdkl"
 
   -- putStrLn "The starting form state was:"
   -- print initialUserInfo

@@ -1,6 +1,11 @@
 module Types where
 import GHC.IO.Handle (Handle)
 
+
+numRows :: Int
+numRows = 10
+numCols :: Int
+numCols = 10
 data Cell = Cell Int Int deriving(Eq, Show, Read)
 type Ship = [Cell]
 
@@ -8,6 +13,7 @@ data Board = Board {
     ships :: [Ship],
     attackedCells :: [Cell]
 } deriving (Show)
+
 
 data Player = Player {
     handle :: Handle,
