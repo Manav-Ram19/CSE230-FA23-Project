@@ -47,7 +47,7 @@ executable client
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , brick
+    , brick >=1.9
     , microlens >=0.4.13.1
     , microlens-th >=0.4.3.14
     , network >=2.7 && <3.2
@@ -82,7 +82,7 @@ executable server
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
-    , brick
+    , brick >=1.9
     , microlens >=0.4.13.1
     , microlens-th >=0.4.3.14
     , network >=2.7 && <3.2

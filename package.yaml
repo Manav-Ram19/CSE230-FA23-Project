@@ -22,7 +22,7 @@ dependencies:
 - base >= 4.7 && < 5
 - network >= 2.7 && < 3.2
 - network-bsd >= 2.7 && < 2.9
-- brick 
+- brick >= 1.9
 - vty >= 5.38
 - text >= 2.0.2
 - microlens >= 0.4.13.1

@@ -34,7 +34,8 @@ data LocalGameState = LocalGameState {
     myBoard :: Board,
     oppBoard :: Board,
     amIP1 :: Bool,
-    turn :: GameTurn
+    turn :: GameTurn, 
+    server :: Server
 } deriving (Show)
 
 type Server = Handle
