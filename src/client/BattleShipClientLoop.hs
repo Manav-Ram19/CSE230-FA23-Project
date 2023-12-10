@@ -1,5 +1,5 @@
 module BattleShipClientLoop where
-    
+
 import Network.Socket
 import GameServerConfig (serverPort)
 import GameClient
@@ -77,7 +77,6 @@ isInList x = foldr (\ y -> (||) (x == y)) False
 
 isSubset :: (Eq a) => [a] -> [a] -> Bool
 isSubset [] _ = True
-isSubset _ [] = False
-isSubset xxs@(x:xs) (y:ys) = if x == y then isSubset xs ys else isSubset xxs ys
+isSubset (x:xs) y = isInList x y && isSubset xs y
 
 
