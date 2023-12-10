@@ -96,7 +96,7 @@ handleEvent (VtyEvent (V.EvKey (V.KChar 'q') []))   = halt
 handleEvent (VtyEvent (V.EvKey V.KUp         []))   = modify $ moveHighlight UI.Up 
 handleEvent (VtyEvent (V.EvKey V.KDown       []))   = modify $ moveHighlight UI.Down 
 handleEvent (VtyEvent (V.EvKey V.KLeft       []))   = modify $ moveHighlight UI.Left
-handleEvent (VtyEvent (V.EvKey V.KRight       []))   = modify $ moveHighlight UI.Right
+handleEvent (VtyEvent (V.EvKey V.KRight      []))   = modify $ moveHighlight UI.Right
 handleEvent _ = pure () 
 
 
