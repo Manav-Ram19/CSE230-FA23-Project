@@ -1,6 +1,11 @@
 module Types where
 import GHC.IO.Handle (Handle)
 
+
+numRows :: Int
+numRows = 10
+numCols :: Int
+numCols = 10
 data Cell = Cell Int Int deriving(Eq, Show, Read)
 type Ship = [Cell]
 
@@ -25,7 +30,8 @@ data LocalGameState = LocalGameState {
     myBoard :: Board,
     oppBoard :: Board,
     amIP1 :: Bool,
-    turn :: GameTurn
+    turn :: GameTurn, 
+    server :: Server
 } deriving (Show)
 
 type Server = Handle

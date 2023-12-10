@@ -6,6 +6,9 @@ import GameClient
 import Types
 import ClientInfra (initClientSocket)
 
+
+
+
 startGame :: HostName -> IO ()
 startGame hostName = do
     h <- initClientSocket hostName serverPort
@@ -13,12 +16,13 @@ startGame hostName = do
     _ <- clientGameLoop igs h
     pure ()
 
+
+
 clientGameLoop :: LocalGameState -> Server -> IO LocalGameState
-clientGameLoop gs@(LocalGameState myb ob isP1 turn) server
+clientGameLoop gs@(LocalGameState myb ob isP1 turn _server) server
     | (isP1 && (turn == Player1)) || (not isP1 && (turn == Player2)) = do
         (attackCell, b1, b2, newTurn) <- playTurn myb ob turn
-        let newGs = LocalGameState b1 b2 isP1 newTurn
-        showClient newGs
+        let newGs = LocalGameState b1 b2 isP1 newTurn _server
         sendGameStateUpdate server attackCell newTurn
         clientGameLoop newGs server
     | turn == GameOver = do
@@ -26,7 +30,7 @@ clientGameLoop gs@(LocalGameState myb ob isP1 turn) server
         pure gs
     | otherwise = do
         (b1, b2, newTurn) <- opponentTurn server myb ob
-        let newGs = LocalGameState b1 b2 isP1 newTurn
+        let newGs = LocalGameState b1 b2 isP1 newTurn _server
         showClient newGs
         clientGameLoop newGs server
 

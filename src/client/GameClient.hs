@@ -17,7 +17,7 @@ getInitialGameState h = do
     playerShips <- getShipsFromClient
     sendToServer (SetShips playerShips) h
     opponentShips <- getOpponentShips h
-    let localGameState = LocalGameState (Board playerShips []) (Board opponentShips []) isP1 Player1
+    let localGameState = LocalGameState (Board playerShips []) (Board opponentShips []) isP1 Player1 h
     showClient localGameState
     pure localGameState
 
