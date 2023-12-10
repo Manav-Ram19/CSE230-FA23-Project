@@ -7,7 +7,7 @@ type Ship = [Cell]
 data Board = Board {
     ships :: [Ship],
     attackedCells :: [Cell]
-}
+} deriving (Show)
 
 data Player = Player {
     handle :: Handle,
@@ -29,7 +29,7 @@ data LocalGameState = LocalGameState {
     oppBoard :: Board,
     amIP1 :: Bool,
     turn :: GameTurn
-}
+} deriving (Show)
 
 type Server = Handle
 type ClientGameLoopCallBack = (LocalGameState -> Server -> IO LocalGameState)
