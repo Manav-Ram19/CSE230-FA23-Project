@@ -1,42 +1,66 @@
 module UI where
 
-import Types
-
 import BattleShipClientLoop (checkForCollision, checkIfPlayerWon, findNextGameTurn, isCellChosenBefore, isSubset)
 import Brick
-import qualified Brick.Widgets.Border as B
-import qualified Brick.Widgets.Center as C
-import Control.Monad.IO.Class (MonadIO (liftIO))
-import GameClient (sendGameStateUpdate, getGameStateUpdate)
-import qualified Graphics.Vty as V
 import Brick.BChan (newBChan, writeBChan)
-import Control.Monad (forever, when, unless)
+import qualified Brick.Widgets.Border as B
+import qualified Brick.Widgets.Border.Style as BS
+import qualified Brick.Widgets.Center as C
 import Control.Concurrent (forkIO)
+import Control.Monad (forever, unless, when)
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import GHC.Conc (threadDelay)
+import GameClient (getGameStateUpdate, sendGameStateUpdate)
+import Graphics.Vty (white)
+import qualified Graphics.Vty as V
+import Graphics.Vty.Attributes.Color
+import Types
 
 -------------------- TYPES --------------------
-data GameStateForUI = GameStateForUI
-  { localGameState :: LocalGameState,
-    currRow :: Int,
-    currCol :: Int
-  } | EndGameStateForUI {
-    didIWin :: Bool
-  }
+data GameStateForUI
+  = GameStateForUI
+      { localGameState :: LocalGameState,
+        currRow :: Int,
+        currCol :: Int
+      }
+  | EndGameStateForUI
+      { didIWin :: Bool
+      }
 
 type Name = ()
 
 data KeyDirection = Left | Right | Up | Down
 
--- theMap :: AttrMap
--- theMap =
---   attrMap
---     V.defAttr
---     []
+
+highlight :: AttrName
+highlight = attrName "highlight"
+hit :: AttrName
+hit       = attrName "hit"
+ship :: AttrName
+ship      = attrName "ship"
+nothing :: AttrName
+nothing   = attrName "nothing"
+
+
+
+highlightBorderAttr, defaultAttr :: AttrName
+highlightBorderAttr = attrName "highlightBorderAttr"
+defaultAttr = attrName "default"
+
+-- tictactoeAttrMap = attrMap V.defAttr [(highlightBorderAttr, U.fg V.cyan)]
 
 myattrApp :: AttrMap
-myattrApp = attrMap (white `on` black) [ (attrName "highlight", fg yellow)
-                                      , (attrName "warning", bg magenta)
-                                      , (attrName "good", white `on` green) ]
+myattrApp =
+  attrMap
+    (brightWhite `on` black)
+    [ (highlight, fg brightYellow),
+      (hit, fg brightRed),
+      (ship, fg brightGreen),
+      (nothing, fg brightBlack)
+      -- (highlightBorderAttr, fg V.cyan)
+    ]
+
+
 
 data RemoteStatusUpdate = RemoteStatusUpdate
 
@@ -44,15 +68,27 @@ data RemoteStatusUpdate = RemoteStatusUpdate
 
 drawCell :: (Char, Bool) -> Widget n
 drawCell (c, highlighted) =
-  if highlighted then withAttr (attrName "warning") (str (" " ++ "D" ++ " ")) else str (" " ++ [c] ++ " ")
+  overrideAttr B.borderAttr attr (B.border (str (" " ++ [renderChar c] ++" ")))
+  where
+  -- if highlighted then withAttr (attrName "warning") (str (" " ++ "D" ++ " ")) else str (" " ++ [c] ++ " ")
+    attr = if highlighted then highlight else getCorrectAttr c
+    getCorrectAttr '.' = nothing
+    getCorrectAttr 's' = ship
+    getCorrectAttr 'x' = hit
+    getCorrectAttr _   = nothing
+    renderChar '.' = ' '
+    renderChar 's' = 'S'
+    renderChar 'x' = 'X'
+    renderChar _   = ' '
 
-makeBoard :: Board -> Bool -> [[Char]]
+
+makeBoard :: Board -> Bool -> [String]
 makeBoard b isOpponentBoard = boardWithAttacks
   where
     boardWithAttacks = foldr (addCellToBoard 'x') (if isOpponentBoard then newBoard else boardWithPlayerShips) (attackedCells b)
     boardWithPlayerShips = foldr (addCellToBoard 's') newBoard (concat (ships b))
     newBoard = replicate 10 (replicate 10 '.')
-    addCellToBoard :: Char -> Cell -> [[Char]] -> [[Char]]
+    addCellToBoard :: Char -> Cell -> [String] -> [String]
     addCellToBoard c (Cell row col) curBoard = modifyListAtInd row (modifyListAtInd col c (getElemAtInd row [] curBoard)) curBoard
     modifyListAtInd :: Int -> a -> [a] -> [a]
     modifyListAtInd ind newVal oldList = take ind oldList ++ [newVal] ++ drop (ind + 1) oldList
@@ -61,9 +97,9 @@ makeBoard b isOpponentBoard = boardWithAttacks
     getElemAtInd 0 _ l = head l
     getElemAtInd n defaultVal (_ : ls) = getElemAtInd (n - 1) defaultVal ls
 
-drawGrid :: [[Char]] -> String -> Int -> Int -> Widget n
+drawGrid :: [String] -> String -> Int -> Int -> Widget n
 drawGrid grid label hRowId hColId =
-  B.borderWithLabel (str label) $
+  withBorderStyle BS.unicodeBold $ B.borderWithLabel (str label) $
     vBox $
       map (hBox . map drawCell) gridWithHighLightBool
   where
@@ -74,16 +110,28 @@ drawGrid grid label hRowId hColId =
     gridWithRowId = zip [0 .. numRows] gridWithColId
     gridWithColId = map (zip [0 .. numCols]) grid
 
+drawGameTurn :: GameTurn -> Bool -> Widget n
+drawGameTurn gt p1 =
+  withBorderStyle BS.unicodeRounded $ B.border $
+    vBox [padAll 1 (str (render myTurn))]
+    where
+      myTurn = isMyTurn p1 gt
+      render False = "Please wait for your opponent to miss..."
+      render True = "Please make a move..."
+
+
+
 draw :: GameStateForUI -> [Widget a]
 draw (EndGameStateForUI isw) = [str $ endGameMessage isw]
   where
     endGameMessage True = "You Won!"
     endGameMessage False = "You Lost."
-draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ C.hCenter grid]
+draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ C.hCenter grid <=> C.hCenter (padTop (Pad 5) turnBox)]
   where
     grid = hBox [drawGrid mb "My Board" (-1) (-1), drawGrid ob "Opponents Board" curRow curCol]
     mb = makeBoard (myBoard lgs) False
     ob = makeBoard (oppBoard lgs) True
+    turnBox = drawGameTurn (turn lgs) (amIP1 lgs)
 
 -------------------- EVENTS -------------------
 
@@ -93,28 +141,24 @@ handleEvent (AppEvent RemoteStatusUpdate) = do
   currState <- get
   case currState of
     EndGameStateForUI _ -> pure ()
-    GameStateForUI lgs _ _ -> do
-        unless (isMyTurn (amIP1 lgs) (turn lgs)) $ do
-            uState <- liftIO (handleRemoteStatusUpdate currState)
-            put uState
-
+    GameStateForUI lgs _ _ -> unless (isMyTurn (amIP1 lgs) (turn lgs)) $ do
+      uState <- liftIO (handleRemoteStatusUpdate currState)
+      put uState
 handleEvent e = do
   currState <- get
   case currState of
     EndGameStateForUI _ -> pure ()
-    GameStateForUI lgs _ _ -> do
-      when (isMyTurn (amIP1 lgs) (turn lgs)) $ do
-          uState <- liftIO (eventHandler e currState)
-          put uState
+    GameStateForUI lgs _ _ -> when (isMyTurn (amIP1 lgs) (turn lgs)) $ do
+      uState <- liftIO (eventHandler e currState)
+      put uState
 
 eventHandler :: BrickEvent n e -> GameStateForUI -> IO GameStateForUI
 eventHandler _ egsui@(EndGameStateForUI _) = pure egsui
-eventHandler (VtyEvent (V.EvKey V.KUp [])) gsui    = pure (moveHighlight UI.Up gsui)
-eventHandler (VtyEvent (V.EvKey V.KDown [])) gsui  = pure (moveHighlight UI.Down gsui)
-eventHandler (VtyEvent (V.EvKey V.KLeft [])) gsui  = pure (moveHighlight UI.Left gsui)
+eventHandler (VtyEvent (V.EvKey V.KUp [])) gsui = pure (moveHighlight UI.Up gsui)
+eventHandler (VtyEvent (V.EvKey V.KDown [])) gsui = pure (moveHighlight UI.Down gsui)
+eventHandler (VtyEvent (V.EvKey V.KLeft [])) gsui = pure (moveHighlight UI.Left gsui)
 eventHandler (VtyEvent (V.EvKey V.KRight [])) gsui = pure (moveHighlight UI.Right gsui)
 eventHandler (VtyEvent (V.EvKey V.KEnter [])) gsui = handleEnter gsui
-
 eventHandler _ gsui = pure gsui
 
 isMyTurn :: Bool -> GameTurn -> Bool
@@ -132,23 +176,22 @@ moveHighlight _ gs = gs
 
 handleEnter :: GameStateForUI -> IO GameStateForUI
 handleEnter gs@(EndGameStateForUI _) = pure gs
-handleEnter gs@(GameStateForUI lgs curRow curCol) = do
-  if isCellChosenBefore (Cell curRow curCol) (oppBoard lgs)
-    then pure gs
-    else do
-      let attackCell = Cell curRow curCol
-      let opponentBoard = oppBoard lgs
-      let isHit = checkForCollision attackCell (ships opponentBoard)
-      let newAttackedCells = attackCell : attackedCells opponentBoard
-      let isGameOver = checkIfPlayerWon newAttackedCells (ships opponentBoard)
-      let newOpBoard = Board (ships opponentBoard) newAttackedCells
-      let newTurn = findNextGameTurn isHit isGameOver (turn lgs)
-      let newgs = LocalGameState (myBoard lgs) newOpBoard (amIP1 lgs) newTurn (server lgs)
-      let newgsui = case newTurn of
-                      GameOver -> EndGameStateForUI (isWinner newgs)
-                      _ -> GameStateForUI newgs curRow curCol
-      sendGameStateUpdate (server newgs) attackCell newTurn
-      pure newgsui
+handleEnter gs@(GameStateForUI lgs curRow curCol) = if isCellChosenBefore (Cell curRow curCol) (oppBoard lgs)
+  then pure gs
+  else do
+    let attackCell = Cell curRow curCol
+    let opponentBoard = oppBoard lgs
+    let isHit = checkForCollision attackCell (ships opponentBoard)
+    let newAttackedCells = attackCell : attackedCells opponentBoard
+    let isGameOver = checkIfPlayerWon newAttackedCells (ships opponentBoard)
+    let newOpBoard = Board (ships opponentBoard) newAttackedCells
+    let newTurn = findNextGameTurn isHit isGameOver (turn lgs)
+    let newgs = LocalGameState (myBoard lgs) newOpBoard (amIP1 lgs) newTurn (server lgs)
+    let newgsui = case newTurn of
+          GameOver -> EndGameStateForUI (isWinner newgs)
+          _ -> GameStateForUI newgs curRow curCol
+    sendGameStateUpdate (server newgs) attackCell newTurn
+    pure newgsui
 
 isWinner :: LocalGameState -> Bool
 isWinner (LocalGameState _ opb _ GameOver _) = isSubset (concat $ ships opb) (attackedCells opb)
@@ -163,8 +206,8 @@ handleRemoteStatusUpdate (GameStateForUI lgs r c) = do
   let myNewBoard = Board (ships myb) (myAttackedCell : attackedCells myb)
   let newLocalGameState = LocalGameState myNewBoard (oppBoard lgs) (amIP1 lgs) turnUpdateFromOpponent (server lgs)
   let newgsui = case turnUpdateFromOpponent of
-                      GameOver -> EndGameStateForUI (isWinner newLocalGameState)
-                      _ -> GameStateForUI newLocalGameState r c
+        GameOver -> EndGameStateForUI (isWinner newLocalGameState)
+        _ -> GameStateForUI newLocalGameState r c
   pure newgsui
 
 -------------------- APP --------------------
