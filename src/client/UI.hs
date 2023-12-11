@@ -12,7 +12,9 @@ import Control.Monad.IO.Class (MonadIO (liftIO))
 import GameClient (sendGameStateUpdate, getGameStateUpdate, getOpponentShips)
 import qualified Graphics.Vty as V
 import Brick.BChan (newBChan, writeBChan)
+import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Border.Style as BS
+import qualified Brick.Widgets.Center as C
 import Control.Concurrent (forkIO)
 import Control.Monad (forever, unless, when)
 
@@ -22,7 +24,7 @@ import ClientMessages (ClientMessages(SetShips))
 import Graphics.Vty (brightWhite, brightYellow, brightRed, brightGreen, brightBlack, brightCyan)
 import Graphics.Vty.Attributes (black)
 
--------------------- TYPES & CONSTANTS --------------------
+-------------------- TYPES --------------------
 data GameStateForUI =
   SetupGameStateForUI {
     _setupships :: [Ship],
@@ -31,7 +33,8 @@ data GameStateForUI =
     _setupcurrCol :: Int,
     _setupcurrDirection :: KeyDirection,
     _nextShipSize :: Int,
-    _isP1 :: Bool
+    _isP1 :: Bool,
+    _sentShipsToServer :: Bool
   }
   | GameStateForUI
   { _localGameState :: LocalGameState,
@@ -54,12 +57,6 @@ ship :: AttrName
 ship      = attrName "ship"
 nothing :: AttrName
 nothing   = attrName "nothing"
-cyan :: AttrName
-cyan   = attrName "cyan"
-red :: AttrName
-red   = attrName "red"
-green :: AttrName
-green   = attrName "green"
 miss :: AttrName
 miss   = attrName "miss"
 
@@ -70,41 +67,12 @@ myattrApp =
     [ (highlight, fg brightYellow),
       (hit, fg brightRed),
       (ship, fg brightGreen),
-      (nothing, fg brightBlack),
-      (cyan, fg brightCyan), 
-      (red, fg brightRed), 
-      (green, fg brightGreen),
       (miss, fg brightCyan),
       (nothing, fg brightBlack)
     ]
 
-battleshipText :: String
-battleshipText = "\n\
-\.______        ___   .___________.___________. __       _______     _______. __    __   __  .______   \n\
-\|   _  \\      /   \\  |           |           ||  |     |   ____|   /       ||  |  |  | |  | |   _  \n\  
-\|  |_)  |    /  ^  \\ `---|  |----`---|  |----`|  |     |  |__     |   (----`|  |__|  | |  | |  |_)  | \n\
-\|   _  <    /  /_\\  \\    |  |        |  |     |  |     |   __|     \\   \\    |   __   | |  | |   ___/ \n\ 
-\|  |_)  |  /  _____  \\   |  |        |  |     |  `----.|  |____.----)   |   |  |  |  | |  | |  |      \n\
-\|______/  /__/     \\__\\  |__|        |__|     |_______||_______|_______/    |__|  |__| |__| | _|  \n"
-
-youLoseText:: String
-youLoseText = "\n\
-\____    ____  ______    __    __     __        ______        _______. _______ \n\
-\\\   \\  /   / /  __  \\  |  |  |  |   |  |      /  __  \\      \\/       ||   ____| \n\
-\ \\   \\/   / |  |  |  | |  |  |  |   |  |     |  |  |  |    |   (----`|  |__   \n\
-\  \\_    _/  |  |  |  | |  |  |  |   |  |     |  |  |  |     \\   \\    |   __|  \n\
-\    |  |    |  `--'  | |  `--'  |   |  `----.|  `--'  | .----)   |   |  |____ \n\
-\    |__|     \\______/   \\______/    |_______| \\______/  |_______/    |_______|\n"
 
 
-youWinText:: String
-youWinText = "\n\
-\____    ____  ______    __    __    ____    __    ____  __  .__   __. \n\
-\\\   \\  /   / /  __  \\  |  |  |  |   \\   \\  /  \\  /   / |  | |  \\ |  | \n\
-\ \\   \\/   / |  |  |  | |  |  |  |    \\   \\/    \\/   /  |  | |   \\|  | \n\
-\  \\_    _/  |  |  |  | |  |  |  |     \\            /   |  | |  . `  | \n\
-\    |  |    |  `--'  | |  `--'  |      \\    /\\    /    |  | |  |\\   | \n\
-\    |__|     \\______/   \\______/        \\__/  \\__/     |__| |__| \\__| "
 data RemoteStatusUpdate = RemoteStatusUpdate
 
 -------------------- DRAWS --------------------
@@ -170,7 +138,7 @@ drawGrid grid label highLightedCells =
 
 drawGameTurn :: GameTurn -> Bool -> Widget n
 drawGameTurn gt p1 =
-  withBorderStyle BS.unicodeRounded $ withBorderStyle BS.unicodeBold $ B.border $
+  withBorderStyle BS.unicodeRounded $ B.border $
     vBox [padAll 1 (str (render myTurn))]
     where
       myTurn = isMyTurn p1 gt
@@ -178,29 +146,16 @@ drawGameTurn gt p1 =
       render True = "Please make a move..."
 
 
-drawTitle :: Widget n
-drawTitle = 
-  overrideAttr B.borderAttr cyan $ B.border $ 
-    vBox [  C.hCenter $ padAll 1 (str (battleshipText))]
-drawEndGame :: Bool -> Widget n 
-drawEndGame False = overrideAttr B.borderAttr red $ B.border $ 
-  vBox [C.hCenter $ padAll 1 (str (youLoseText))]
-
-drawEndGame True = overrideAttr B.borderAttr green $ B.border $ 
-  vBox [C.hCenter $ padAll 1 (str (youWinText))]
-
 draw :: GameStateForUI -> [Widget a]
--- setup game state
-draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _) = [C.vCenter (C.hCenter drawTitle <=> C.hCenter grid)]
+draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _ _) = [C.vCenter (C.hCenter grid)]
   where
     grid = hBox [drawGrid mb "My Board" (getPositionsFromStartDirAndLen (curR, curC) shipSize curDir)]
-    mb = makePlayerBoard (Board myShips [])
-
--- end game state
-draw (EndGameStateForUI isw) = [C.vCenter $ C.hCenter (drawEndGame isw)]
-
---  during game
-draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ drawTitle <=> C.hCenter grid <=> C.hCenter (padTop (Pad 4) turnBox)]
+    mb = addShipsToBoard (Board myShips []) makeEmptyBoard
+draw (EndGameStateForUI isw) = [str $ endGameMessage isw]
+  where
+    endGameMessage True = "You Won!"
+    endGameMessage False = "You Lost."
+draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ C.hCenter grid <=> C.hCenter (padTop (Pad 4) turnBox)]
   where
     grid = hBox [drawGrid mb "My Board" [], drawGrid ob "Opponents Board" highlightedCells]
     mb = makePlayerBoard (myBoard lgs)
@@ -225,42 +180,43 @@ handleEventSetupGame e = do
   eventHandler e sgsui
   where
     eventHandler :: BrickEvent Name RemoteStatusUpdate -> GameStateForUI -> EventM n GameStateForUI ()
-    eventHandler(AppEvent RemoteStatusUpdate) sgsui@(SetupGameStateForUI ss s r c dir nss isP1) = do
+    eventHandler(AppEvent RemoteStatusUpdate) sgsui@(SetupGameStateForUI ss s r c dir nss isP1 sent) = do
       if length ss < numShipsPerPlayer then pure ()
       else do
         -- Construct and return a GSUI
-        -- Send ships to opponent
-        _ <- liftIO $ sendToServer (SetShips ss) s
         -- Get ships from opponent
-        oppShips <- liftIO $ getOpponentShips s
-        -- Create new local game state
-        let lgs = LocalGameState (Board ss []) (Board oppShips []) isP1 Player1 s
-        -- Create GSUI
-        let gsui = GameStateForUI lgs 0 0
-        put gsui
+        maybeoppShips <- liftIO $ getOpponentShips s
+        case maybeoppShips of
+          Just oppShips -> do
+          -- Create new local game state
+            let lgs = LocalGameState (Board ss []) (Board oppShips []) isP1 Player1 s
+            -- Create GSUI
+            let gsui = GameStateForUI lgs 0 0
+            put gsui
+          _ -> pure ()
     eventHandler (VtyEvent (V.EvKey V.KUp [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UI.Up sgsui
     eventHandler (VtyEvent (V.EvKey V.KDown [])) sgsui@(SetupGameStateForUI {}) = do put $  moveHighlight UI.Down sgsui
     eventHandler (VtyEvent (V.EvKey V.KLeft [])) sgsui@(SetupGameStateForUI {}) = do put $  moveHighlight UI.Left sgsui
     eventHandler (VtyEvent (V.EvKey V.KRight [])) sgsui@(SetupGameStateForUI {}) = do put $  moveHighlight UI.Right sgsui
     -- Clockwise Rotation
-    eventHandler (VtyEvent (V.EvKey (V.KChar 'z') [])) (SetupGameStateForUI ss s r c dir nss isP1) = do
+    eventHandler (VtyEvent (V.EvKey (V.KChar 'z') [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1 sent) = do
       let newDir = case dir of
                     UI.Left -> UI.Up
                     UI.Up -> UI.Right
                     UI.Right -> UI.Down
                     UI.Down -> UI.Left
-      let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1
+      let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1 sent
       put newSGSUI
     -- Anti-Clockwise Rotation
-    eventHandler (VtyEvent (V.EvKey (V.KChar 'x') [])) (SetupGameStateForUI ss s r c dir nss isP1) = do
+    eventHandler (VtyEvent (V.EvKey (V.KChar 'x') [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1 sent) = do
       let newDir = case dir of
                     UI.Left -> UI.Down
                     UI.Up -> UI.Left
                     UI.Right -> UI.Up
                     UI.Down -> UI.Right
-      let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1
+      let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1 sent
       put newSGSUI
-    eventHandler (VtyEvent (V.EvKey V.KEnter [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1) = do
+    eventHandler (VtyEvent (V.EvKey V.KEnter [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1 sent) = do
       if length ss >= numShipsPerPlayer then pure ()
       else do
         -- Check if cell list crosses any boundaries
@@ -275,15 +231,21 @@ handleEventSetupGame e = do
         -- Generate new sgsui
             let newShips = ss ++ [newShipPlacement]
             case numShipsToNextShipSize $ length newShips of
-              Just nextShipSize -> put (SetupGameStateForUI newShips s r c dir nextShipSize isP1)
-              Nothing -> put (SetupGameStateForUI newShips s r c dir 2 isP1) {- TODO: Remove this 2. Was added for UI testing -}
+              Just nextShipSize -> put (SetupGameStateForUI newShips s r c dir nextShipSize isP1 sent)
+              Nothing -> do
+                -- No ships left to add, so send to server if i haven't sent before
+                if not sent then do
+                  liftIO $ sendToServer (SetShips ss) s
+                  put (SetupGameStateForUI newShips s r c dir 0 isP1 True)
+                else
+                  put (SetupGameStateForUI newShips s r c dir 0 isP1 sent)
     eventHandler _ _ = pure ()
 
 isShipPlacementOutOfBounds:: (Int, Int) -> Int -> KeyDirection -> Bool
-isShipPlacementOutOfBounds (startR, _) shipLen UI.Up = startR - shipLen + 1 < 0
-isShipPlacementOutOfBounds (startR, _) shipLen UI.Down = startR + shipLen - 1 >= numRows
-isShipPlacementOutOfBounds (_, startC) shipLen UI.Left = startC - shipLen + 1 < 0
-isShipPlacementOutOfBounds (_, startC) shipLen UI.Right = startC + shipLen - 1 >= numCols
+isShipPlacementOutOfBounds (startR, startC) shipLen UI.Up = startR - shipLen + 1 < 0
+isShipPlacementOutOfBounds (startR, startC) shipLen UI.Down = startR + shipLen - 1 >= numRows
+isShipPlacementOutOfBounds (startR, startC) shipLen UI.Left = startC - shipLen + 1 < 0
+isShipPlacementOutOfBounds (startR, startC) shipLen UI.Right = startC + shipLen - 1 >= numCols
 
 getPositionsFromStartDirAndLen :: (Int, Int) -> Int -> KeyDirection -> [(Int, Int)]
 getPositionsFromStartDirAndLen _ 0 _ = []
@@ -345,10 +307,10 @@ moveHighlight UI.Down (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((
 moveHighlight UI.Left (GameStateForUI lgs curRow curCol) = GameStateForUI lgs curRow ((curCol + numCols - 1) `mod` numCols)
 moveHighlight UI.Right (GameStateForUI lgs curRow curCol) = GameStateForUI lgs curRow ((curCol + 1) `mod` numCols)
 
-moveHighlight UI.Up (SetupGameStateForUI ss s curRow curCol curDir nss isP1) = SetupGameStateForUI ss s ((curRow + numRows - 1) `mod` numRows) curCol curDir nss isP1
-moveHighlight UI.Down (SetupGameStateForUI ss s curRow curCol curDir nss isP1) = SetupGameStateForUI ss s ((curRow + 1) `mod` numRows) curCol curDir nss isP1
-moveHighlight UI.Left (SetupGameStateForUI ss s curRow curCol curDir nss isP1) = SetupGameStateForUI ss s curRow ((curCol + numCols - 1) `mod` numCols) curDir nss isP1
-moveHighlight UI.Right (SetupGameStateForUI ss s curRow curCol curDir nss isP1) = SetupGameStateForUI ss s curRow ((curCol + 1) `mod` numCols) curDir nss isP1
+moveHighlight UI.Up (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s ((curRow + numRows - 1) `mod` numRows) curCol curDir nss isP1 sent
+moveHighlight UI.Down (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s ((curRow + 1) `mod` numRows) curCol curDir nss isP1 sent
+moveHighlight UI.Left (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s curRow ((curCol + numCols - 1) `mod` numCols) curDir nss isP1 sent
+moveHighlight UI.Right (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s curRow ((curCol + 1) `mod` numCols) curDir nss isP1 sent
 
 
 moveHighlight _ gs = gs
@@ -411,5 +373,5 @@ startUI s isP1 = do
     writeBChan chan RemoteStatusUpdate
     threadDelay 100000
 
-  _ <- customMain initialVty builder (Just chan) app (SetupGameStateForUI [] s 0 0 UI.Right 2 (isP1))
+  _ <- customMain initialVty builder (Just chan) app (SetupGameStateForUI [] s 0 0 UI.Right 2 (isP1) False)
   putStrLn ""
