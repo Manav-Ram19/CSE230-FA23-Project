@@ -21,7 +21,7 @@ import Control.Monad (forever, unless, when)
 import GHC.Conc (threadDelay)
 import ClientInfra (sendToServer)
 import ClientMessages (ClientMessages(SetShips))
-import Graphics.Vty (brightWhite, brightYellow, brightRed, brightGreen, brightBlack)
+import Graphics.Vty (brightWhite, brightYellow, brightRed, brightGreen, brightBlack, brightCyan)
 import Graphics.Vty.Attributes (black)
 
 -------------------- TYPES --------------------
@@ -56,6 +56,8 @@ ship :: AttrName
 ship      = attrName "ship"
 nothing :: AttrName
 nothing   = attrName "nothing"
+cyan :: AttrName
+cyan   = attrName "cyan"
 
 myattrApp :: AttrMap
 myattrApp =
@@ -64,7 +66,8 @@ myattrApp =
     [ (highlight, fg brightYellow),
       (hit, fg brightRed),
       (ship, fg brightGreen),
-      (nothing, fg brightBlack)
+      (nothing, fg brightBlack),
+      (cyan, fg brightCyan)
     ]
 
 
@@ -119,24 +122,41 @@ drawGrid grid label highLightedCells =
 
 drawGameTurn :: GameTurn -> Bool -> Widget n
 drawGameTurn gt p1 =
-  withBorderStyle BS.unicodeRounded $ B.border $
+  withBorderStyle BS.unicodeRounded $ withBorderStyle BS.unicodeBold $ B.border $
     vBox [padAll 1 (str (render myTurn))]
     where
       myTurn = isMyTurn p1 gt
       render False = "Please wait for your opponent to miss..."
       render True = "Please make a move..."
 
+battleshipText = "\n\
+\.______        ___   .___________.___________. __       _______     _______. __    __   __  .______   \n\
+\|   _  \\      /   \\  |           |           ||  |     |   ____|   /       ||  |  |  | |  | |   _  \n\  
+\|  |_)  |    /  ^  \\ `---|  |----`---|  |----`|  |     |  |__     |   (----`|  |__|  | |  | |  |_)  | \n\
+\|   _  <    /  /_\\  \\    |  |        |  |     |  |     |   __|     \\   \\    |   __   | |  | |   ___/ \n\ 
+\|  |_)  |  /  _____  \\   |  |        |  |     |  `----.|  |____.----)   |   |  |  |  | |  | |  |      \n\
+\|______/  /__/     \\__\\  |__|        |__|     |_______||_______|_______/    |__|  |__| |__| | _|  \n"
+
+drawTitle :: Widget n
+drawTitle = 
+  overrideAttr B.borderAttr cyan $ B.border $ 
+    vBox [  C.hCenter $ padAll 1 (str (battleshipText))]
 
 draw :: GameStateForUI -> [Widget a]
-draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _) = [C.vCenter (C.hCenter grid)]
+-- setup game state
+draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _) = [C.vCenter (C.hCenter drawTitle <=> C.hCenter grid)]
   where
     grid = hBox [drawGrid mb "My Board" (getPositionsFromStartDirAndLen (curR, curC) shipSize curDir)]
     mb = makeBoard (Board myShips []) False
+
+-- end game state
 draw (EndGameStateForUI isw) = [str $ endGameMessage isw]
   where
     endGameMessage True = "You Won!"
     endGameMessage False = "You Lost."
-draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ C.hCenter grid <=> C.hCenter (padTop (Pad 4) turnBox)]
+
+--  during game
+draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ drawTitle <=> C.hCenter grid <=> C.hCenter (padTop (Pad 4) turnBox)]
   where
     grid = hBox [drawGrid mb "My Board" [], drawGrid ob "Opponents Board" [(curRow, curCol)]]
     mb = makeBoard (myBoard lgs) False
@@ -165,7 +185,7 @@ handleEventSetupGame e = do
     eventHandler (VtyEvent (V.EvKey V.KLeft [])) sgsui@(SetupGameStateForUI {}) = do put $  moveHighlight UI.Left sgsui
     eventHandler (VtyEvent (V.EvKey V.KRight [])) sgsui@(SetupGameStateForUI {}) = do put $  moveHighlight UI.Right sgsui
     -- Clockwise Rotation
-    eventHandler (VtyEvent (V.EvKey (V.KChar 'z') [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1) = do
+    eventHandler (VtyEvent (V.EvKey (V.KChar 'z') [])) (SetupGameStateForUI ss s r c dir nss isP1) = do
       let newDir = case dir of
                     UI.Left -> UI.Up
                     UI.Up -> UI.Right
@@ -174,7 +194,7 @@ handleEventSetupGame e = do
       let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1
       put newSGSUI
     -- Anti-Clockwise Rotation
-    eventHandler (VtyEvent (V.EvKey (V.KChar 'x') [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1) = do
+    eventHandler (VtyEvent (V.EvKey (V.KChar 'x') [])) (SetupGameStateForUI ss s r c dir nss isP1) = do
       let newDir = case dir of
                     UI.Left -> UI.Down
                     UI.Up -> UI.Left
@@ -182,7 +202,7 @@ handleEventSetupGame e = do
                     UI.Down -> UI.Right
       let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1
       put newSGSUI
-    eventHandler (VtyEvent (V.EvKey V.KEnter [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1) = do
+    eventHandler (VtyEvent (V.EvKey V.KEnter [])) (SetupGameStateForUI ss s r c dir nss isP1) = do
       -- Check if cell list crosses any boundaries
       if isShipPlacementOutOfBounds (r, c) nss dir then pure ()
       else do
@@ -210,10 +230,10 @@ handleEventSetupGame e = do
     eventHandler _ _ = pure ()
 
 isShipPlacementOutOfBounds:: (Int, Int) -> Int -> KeyDirection -> Bool
-isShipPlacementOutOfBounds (startR, startC) shipLen UI.Up = startR - shipLen + 1 < 0
-isShipPlacementOutOfBounds (startR, startC) shipLen UI.Down = startR + shipLen - 1 >= numRows
-isShipPlacementOutOfBounds (startR, startC) shipLen UI.Left = startC - shipLen + 1 < 0
-isShipPlacementOutOfBounds (startR, startC) shipLen UI.Right = startC + shipLen - 1 >= numCols
+isShipPlacementOutOfBounds (startR, _) shipLen UI.Up = startR - shipLen + 1 < 0
+isShipPlacementOutOfBounds (startR, _) shipLen UI.Down = startR + shipLen - 1 >= numRows
+isShipPlacementOutOfBounds (_, startC) shipLen UI.Left = startC - shipLen + 1 < 0
+isShipPlacementOutOfBounds (_, startC) shipLen UI.Right = startC + shipLen - 1 >= numCols
 
 getPositionsFromStartDirAndLen :: (Int, Int) -> Int -> KeyDirection -> [(Int, Int)]
 getPositionsFromStartDirAndLen _ 0 _ = []
