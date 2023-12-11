@@ -12,9 +12,7 @@ import Control.Monad.IO.Class (MonadIO (liftIO))
 import GameClient (sendGameStateUpdate, getGameStateUpdate, getOpponentShips)
 import qualified Graphics.Vty as V
 import Brick.BChan (newBChan, writeBChan)
-import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Border.Style as BS
-import qualified Brick.Widgets.Center as C
 import Control.Concurrent (forkIO)
 import Control.Monad (forever, unless, when)
 
@@ -24,7 +22,7 @@ import ClientMessages (ClientMessages(SetShips))
 import Graphics.Vty (brightWhite, brightYellow, brightRed, brightGreen, brightBlack, brightCyan)
 import Graphics.Vty.Attributes (black)
 
--------------------- TYPES --------------------
+-------------------- TYPES & CONSTANTS --------------------
 data GameStateForUI =
   SetupGameStateForUI {
     _setupships :: [Ship],
