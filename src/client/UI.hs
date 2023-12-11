@@ -235,7 +235,7 @@ handleEventSetupGame e = do
               Nothing -> do
                 -- No ships left to add, so send to server if i haven't sent before
                 if not sent then do
-                  liftIO $ sendToServer (SetShips ss) s
+                  liftIO $ sendToServer (SetShips newShips) s
                   put (SetupGameStateForUI newShips s r c dir 0 isP1 True)
                 else
                   put (SetupGameStateForUI newShips s r c dir 0 isP1 sent)
