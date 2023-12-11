@@ -2,12 +2,17 @@ module UI
   ( startUI,
   )
 where
-
+import UIConst (RemoteStatusUpdate (..), GameStateForUI (..), Name, KeyDirection (..), myattrApp)
+import UIDraw
+    ( drawGrid,
+      drawTitle,
+      drawShipsRemaining,
+      drawTutorial,
+      drawGameTurn,
+      drawEndGame )
 import BattleShipClientLoop (checkForCollision, checkIfPlayerWon, findNextGameTurn, isCellChosenBefore, isInList, isSubset)
 import Brick
 import Brick.BChan (newBChan, writeBChan)
-import qualified Brick.Widgets.Border as B
-import qualified Brick.Widgets.Border.Style as BS
 import qualified Brick.Widgets.Center as C
 import ClientInfra (sendToServer)
 import ClientMessages (ClientMessages (SetShips))
@@ -16,125 +21,8 @@ import Control.Monad (forever, unless, when)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import GHC.Conc (threadDelay)
 import GameClient (getGameStateUpdate, getOpponentShips, sendGameStateUpdate)
-import Graphics.Vty (brightBlack, brightCyan, brightGreen, brightRed, brightWhite, brightYellow)
 import qualified Graphics.Vty as V
-import Graphics.Vty.Attributes (black)
 import Types
-
--------------------- TYPES --------------------
-data GameStateForUI =
-  SetupGameStateForUI {
-    _setupships :: [Ship],
-    _setupserver :: Server,
-    _setupcurrRow :: Int,
-    _setupcurrCol :: Int,
-    _setupcurrDirection :: KeyDirection,
-    _nextShipSize :: Int,
-    _isP1 :: Bool,
-    _sentShipsToServer :: Bool
-  }
-  | GameStateForUI
-      { _localGameState :: LocalGameState,
-        _currRow :: Int,
-        _currCol :: Int
-      }
-  | EndGameStateForUI
-      { _didClientWin :: Bool
-      }
-
-type Name = ()
-
-data KeyDirection = Left | Right | Up | Down
-
-highlight :: AttrName
-highlight = attrName "highlight"
-
-hit :: AttrName
-hit = attrName "hit"
-
-ship :: AttrName
-ship = attrName "ship"
-
-nothing :: AttrName
-nothing = attrName "nothing"
-
-cyan :: AttrName
-cyan = attrName "cyan"
-
-red :: AttrName
-red = attrName "red"
-
-green :: AttrName
-green = attrName "green"
-
-miss :: AttrName
-miss = attrName "miss"
-
-myattrApp :: AttrMap
-myattrApp =
-  attrMap
-    (brightWhite `on` black)
-    [ (highlight, fg brightYellow),
-      (hit, fg brightRed),
-      (ship, fg brightGreen),
-      (nothing, fg brightBlack),
-      (cyan, fg brightCyan),
-      (red, fg brightRed),
-      (green, fg brightGreen),
-      (miss, fg brightCyan),
-      (nothing, fg brightBlack)
-    ]
-
-battleshipText :: String
-battleshipText =
-  "\n\
-  \.______        ___   .___________.___________. __       _______     _______. __    __   __  .______   \n\
-  \|   _  \\      /   \\  |           |           ||  |     |   ____|   /       ||  |  |  | |  | |   _  \n\
-  \|  |_)  |    /  ^  \\ `---|  |----`---|  |----`|  |     |  |__     |   (----`|  |__|  | |  | |  |_)  | \n\
-  \|   _  <    /  /_\\  \\    |  |        |  |     |  |     |   __|     \\   \\    |   __   | |  | |   ___/ \n\
-  \|  |_)  |  /  _____  \\   |  |        |  |     |  `----.|  |____.----)   |   |  |  |  | |  | |  |      \n\
-  \|______/  /__/     \\__\\  |__|        |__|     |_______||_______|_______/    |__|  |__| |__| | _|  \n"
-
-youLoseText :: String
-youLoseText =
-  "\n\
-  \____    ____  ______    __    __     __        ______        _______. _______ \n\
-  \\\   \\  /   / /  __  \\  |  |  |  |   |  |      /  __  \\      \\/       ||   ____| \n\
-  \ \\   \\/   / |  |  |  | |  |  |  |   |  |     |  |  |  |    |   (----`|  |__   \n\
-  \  \\_    _/  |  |  |  | |  |  |  |   |  |     |  |  |  |     \\   \\    |   __|  \n\
-  \    |  |    |  `--'  | |  `--'  |   |  `----.|  `--'  | .----)   |   |  |____ \n\
-  \    |__|     \\______/   \\______/    |_______| \\______/  |_______/    |_______|\n"
-
-youWinText :: String
-youWinText =
-  "\n\
-  \____    ____  ______    __    __    ____    __    ____  __  .__   __. \n\
-  \\\   \\  /   / /  __  \\  |  |  |  |   \\   \\  /  \\  /   / |  | |  \\ |  | \n\
-  \ \\   \\/   / |  |  |  | |  |  |  |    \\   \\/    \\/   /  |  | |   \\|  | \n\
-  \  \\_    _/  |  |  |  | |  |  |  |     \\            /   |  | |  . `  | \n\
-  \    |  |    |  `--'  | |  `--'  |      \\    /\\    /    |  | |  |\\   | \n\
-  \    |__|     \\______/   \\______/        \\__/  \\__/     |__| |__| \\__| "
-
-data RemoteStatusUpdate = RemoteStatusUpdate
-
--------------------- DRAWS --------------------
-
-drawCell :: (Char, Bool) -> Widget n
-drawCell (c, highlighted) =
-  overrideAttr B.borderAttr attr (B.border (str (" " ++ [renderChar c] ++ " ")))
-  where
-    -- if highlighted then withAttr (attrName "warning") (str (" " ++ "D" ++ " ")) else str (" " ++ [c] ++ " ")
-    attr = if highlighted then highlight else getCorrectAttr c
-    getCorrectAttr '.' = nothing
-    getCorrectAttr 's' = ship
-    getCorrectAttr 'x' = hit
-    getCorrectAttr 'm' = miss
-    getCorrectAttr _ = nothing
-    renderChar '.' = ' '
-    renderChar 's' = 'S'
-    renderChar 'x' = 'X'
-    renderChar 'm' = 'M'
-    renderChar _ = ' '
 
 makeEmptyBoard :: [String]
 makeEmptyBoard = replicate 10 (replicate 10 '.')
@@ -165,80 +53,10 @@ getElemAtInd _ defaultVal [] = defaultVal
 getElemAtInd 0 _ l = head l
 getElemAtInd n defaultVal (_ : ls) = getElemAtInd (n - 1) defaultVal ls
 
-drawGrid :: [[Char]] -> String -> [(Int, Int)] -> Widget n
-drawGrid grid label highLightedCells =
-  B.borderWithLabel (str label) $
-    vBox $
-      map (hBox . map drawCell) gridWithHighLightBool
-  where
-    gridWithHighLightBool = map convertRow gridWithRowId
-    convertRow :: (Int, [(Int, Char)]) -> [(Char, Bool)]
-    convertRow (_, []) = []
-    convertRow (rowId, (colId, c) : ls) = (if isInList (rowId, colId) highLightedCells then (c, True) else (c, False)) : convertRow (rowId, ls)
-    gridWithRowId = zip [0 .. (numRows - 1)] gridWithColId
-    gridWithColId = map (zip [0 .. (numCols - 1)]) grid
-
-drawGameTurn :: GameTurn -> Bool -> Widget n
-drawGameTurn gt p1 =
-  withBorderStyle BS.unicodeRounded $
-    withBorderStyle BS.unicodeBold $
-      B.border $
-        vBox [padAll 1 (str (render myTurn))]
-  where
-    myTurn = isMyTurn p1 gt
-    render False = "Please wait for your opponent to miss..."
-    render True = "Please make a move..."
-
-drawShipsRemaining :: [Ship] -> Widget n
-drawShipsRemaining myShips =
-  hLimit 30 $
-  vLimit 3 $
-  withBorderStyle BS.unicodeRounded $
-    B.borderWithLabel (str "Ships Left") $
-      hBox [fill ' ', str (show (numShipsPerPlayer - (length myShips))), fill ' ']
-drawShipsRemaining _ = error "should not happen"
-
-
-
-drawTutorial :: Widget n
-drawTutorial =
-  hLimit 50 $
-  withBorderStyle BS.unicodeRounded $
-        B.borderWithLabel (str "Tutorial") $
-          vBox $
-            map (\tup -> uncurry drawTutorialRow tup)
-              [ ("Left", "←"),
-                ("Up", "↑"),
-                ("Right", "→"),
-                ("Down", "↓"),
-                ("Place Ship", "Enter"),
-                ("Clockwise Rotate", "x"),
-                ("CounterClockwise Rotate ", "y"),
-                ("Quit", "q")
-              ]
-  where
-    drawTutorialRow action key =
-      (padRight Max $ padLeft (Pad 1) $ str action) <+> (padLeft Max $ padRight (Pad 1) $ str key)
-
-drawTitle :: Widget n
-drawTitle =
-  overrideAttr B.borderAttr cyan $
-    B.border $
-      vBox [C.hCenter $ padAll 1 (str (battleshipText))]
-
-drawEndGame :: Bool -> Widget n
-drawEndGame False =
-  overrideAttr B.borderAttr red $
-    B.border $
-      vBox [C.hCenter $ padAll 1 (str (youLoseText))]
-drawEndGame True =
-  overrideAttr B.borderAttr green $
-    B.border $
-      vBox [C.hCenter $ padAll 1 (str (youWinText))]
 
 draw :: GameStateForUI -> [Widget a]
--- setup game state
-draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _ _) = [C.vCenter (C.hCenter drawTitle <=> C.hCenter grid <=> C.hCenter (drawShipsRemaining myShips) <=> C.hCenter drawTutorial)]
+-- setup gamee state
+draw (UIConst.SetupGameStateForUI myShips _ curR curC curDir shipSize _ _) = [C.vCenter (C.hCenter drawTitle <=> C.hCenter grid <=> C.hCenter (drawShipsRemaining (numShipsPerPlayer - length myShips)) <=> C.hCenter drawTutorial)]
   where
     grid = hBox [drawGrid mb "My Board" (getPositionsFromStartDirAndLen (curR, curC) shipSize curDir)]
     mb = makePlayerBoard (Board myShips [])
@@ -251,7 +69,7 @@ draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ drawTitle <=> C.hCenter g
     grid = hBox [drawGrid mb "My Board" [], drawGrid ob "Opponents Board" highlightedCells]
     mb = makePlayerBoard (myBoard lgs)
     ob = makeOpponentBoard (oppBoard lgs)
-    turnBox = drawGameTurn (turn lgs) (amIP1 lgs)
+    turnBox = drawGameTurn (isMyTurn (amIP1 lgs) (turn lgs))
     highlightedCells = [(curRow, curCol) | isMyTurn (amIP1 lgs) (turn lgs)]
 
 -------------------- EVENTS -------------------
@@ -285,26 +103,26 @@ handleEventSetupGame e = do
             let gsui = GameStateForUI lgs 0 0
             put gsui
           _ -> pure ()
-    eventHandler (VtyEvent (V.EvKey V.KUp [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UI.Up sgsui
-    eventHandler (VtyEvent (V.EvKey V.KDown [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UI.Down sgsui
-    eventHandler (VtyEvent (V.EvKey V.KLeft [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UI.Left sgsui
-    eventHandler (VtyEvent (V.EvKey V.KRight [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UI.Right sgsui
+    eventHandler (VtyEvent (V.EvKey V.KUp [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UIConst.Right sgsui
+    eventHandler (VtyEvent (V.EvKey V.KDown [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UIConst.Down sgsui
+    eventHandler (VtyEvent (V.EvKey V.KLeft [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UIConst.Left sgsui
+    eventHandler (VtyEvent (V.EvKey V.KRight [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UIConst.Right sgsui
     -- Clockwise Rotation
     eventHandler (VtyEvent (V.EvKey (V.KChar 'z') [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1 sent) = do
       let newDir = case dir of
-                    UI.Left -> UI.Up
-                    UI.Up -> UI.Right
-                    UI.Right -> UI.Down
-                    UI.Down -> UI.Left
+                    UIConst.Left -> UIConst.Up
+                    UIConst.Up -> UIConst.Right
+                    UIConst.Right -> UIConst.Down
+                    UIConst.Down -> UIConst.Left
       let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1 sent
       put newSGSUI
     -- Anti-Clockwise Rotation
     eventHandler (VtyEvent (V.EvKey (V.KChar 'x') [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1 sent) = do
       let newDir = case dir of
-                    UI.Left -> UI.Down
-                    UI.Up -> UI.Left
-                    UI.Right -> UI.Up
-                    UI.Down -> UI.Right
+                    UIConst.Left -> UIConst.Down
+                    UIConst.Up -> UIConst.Left
+                    UIConst.Right -> UIConst.Up
+                    UIConst.Down -> UIConst.Right
       let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1 sent
       put newSGSUI
     eventHandler (VtyEvent (V.EvKey V.KEnter [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1 sent) = do
@@ -333,21 +151,21 @@ handleEventSetupGame e = do
     eventHandler _ _ = pure ()
 
 isShipPlacementOutOfBounds:: (Int, Int) -> Int -> KeyDirection -> Bool
-isShipPlacementOutOfBounds (startR, startC) shipLen UI.Up = startR - shipLen + 1 < 0
-isShipPlacementOutOfBounds (startR, startC) shipLen UI.Down = startR + shipLen - 1 >= numRows
-isShipPlacementOutOfBounds (startR, startC) shipLen UI.Left = startC - shipLen + 1 < 0
-isShipPlacementOutOfBounds (startR, startC) shipLen UI.Right = startC + shipLen - 1 >= numCols
+isShipPlacementOutOfBounds (startR, startC) shipLen UIConst.Up = startR - shipLen + 1 < 0
+isShipPlacementOutOfBounds (startR, startC) shipLen UIConst.Down = startR + shipLen - 1 >= numRows
+isShipPlacementOutOfBounds (startR, startC) shipLen UIConst.Left = startC - shipLen + 1 < 0
+isShipPlacementOutOfBounds (startR, startC) shipLen UIConst.Right = startC + shipLen - 1 >= numCols
 
 getPositionsFromStartDirAndLen :: (Int, Int) -> Int -> KeyDirection -> [(Int, Int)]
 getPositionsFromStartDirAndLen _ 0 _ = []
 getPositionsFromStartDirAndLen (r, c) l dir = (r, c) : getPositionsFromStartDirAndLen (nr, nc) (l - 1) dir
   where
     (nr, nc) = (updateRow r dir, updateCol c dir)
-    updateRow row UI.Up = (row + numRows - 1) `mod` numRows
-    updateRow row UI.Down = (row + 1) `mod` numRows
+    updateRow row UIConst.Up = (row + numRows - 1) `mod` numRows
+    updateRow row UIConst.Down = (row + 1) `mod` numRows
     updateRow row _ = row
-    updateCol col UI.Left = (col + numCols - 1) `mod` numCols
-    updateCol col UI.Right = (col + 1) `mod` numCols
+    updateCol col UIConst.Left = (col + numCols - 1) `mod` numCols
+    updateCol col UIConst.Right = (col + 1) `mod` numCols
     updateCol col _ = col
 
 -- Dry violation
@@ -379,10 +197,10 @@ handleEventPlayGame e = do
     _ -> pure ()
   where
     eventHandler :: BrickEvent n e -> GameStateForUI -> IO GameStateForUI
-    eventHandler (VtyEvent (V.EvKey V.KUp [])) gsui = pure (moveHighlight UI.Up gsui)
-    eventHandler (VtyEvent (V.EvKey V.KDown [])) gsui = pure (moveHighlight UI.Down gsui)
-    eventHandler (VtyEvent (V.EvKey V.KLeft [])) gsui = pure (moveHighlight UI.Left gsui)
-    eventHandler (VtyEvent (V.EvKey V.KRight [])) gsui = pure (moveHighlight UI.Right gsui)
+    eventHandler (VtyEvent (V.EvKey V.KUp [])) gsui = pure (moveHighlight UIConst.Up gsui)
+    eventHandler (VtyEvent (V.EvKey V.KDown [])) gsui = pure (moveHighlight UIConst.Down gsui)
+    eventHandler (VtyEvent (V.EvKey V.KLeft [])) gsui = pure (moveHighlight UIConst.Left gsui)
+    eventHandler (VtyEvent (V.EvKey V.KRight [])) gsui = pure (moveHighlight UIConst.Right gsui)
     eventHandler (VtyEvent (V.EvKey V.KEnter [])) gsui = handleEnter gsui
     eventHandler _ gsui = pure gsui
 
@@ -393,15 +211,15 @@ isMyTurn _ _ = False
 
 -- uses direction to upate game state to move current highlighted cell
 moveHighlight :: KeyDirection -> GameStateForUI -> GameStateForUI
-moveHighlight UI.Up (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((curRow + numRows - 1) `mod` numRows) curCol
-moveHighlight UI.Down (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((curRow + 1) `mod` numRows) curCol
-moveHighlight UI.Left (GameStateForUI lgs curRow curCol) = GameStateForUI lgs curRow ((curCol + numCols - 1) `mod` numCols)
-moveHighlight UI.Right (GameStateForUI lgs curRow curCol) = GameStateForUI lgs curRow ((curCol + 1) `mod` numCols)
+moveHighlight UIConst.Up (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((curRow + numRows - 1) `mod` numRows) curCol
+moveHighlight UIConst.Down (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((curRow + 1) `mod` numRows) curCol
+moveHighlight UIConst.Left (GameStateForUI lgs curRow curCol) = GameStateForUI lgs curRow ((curCol + numCols - 1) `mod` numCols)
+moveHighlight UIConst.Right (GameStateForUI lgs curRow curCol) = GameStateForUI lgs curRow ((curCol + 1) `mod` numCols)
 
-moveHighlight UI.Up (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s ((curRow + numRows - 1) `mod` numRows) curCol curDir nss isP1 sent
-moveHighlight UI.Down (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s ((curRow + 1) `mod` numRows) curCol curDir nss isP1 sent
-moveHighlight UI.Left (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s curRow ((curCol + numCols - 1) `mod` numCols) curDir nss isP1 sent
-moveHighlight UI.Right (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s curRow ((curCol + 1) `mod` numCols) curDir nss isP1 sent
+moveHighlight UIConst.Up (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s ((curRow + numRows - 1) `mod` numRows) curCol curDir nss isP1 sent
+moveHighlight UIConst.Down (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s ((curRow + 1) `mod` numRows) curCol curDir nss isP1 sent
+moveHighlight UIConst.Left (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s curRow ((curCol + numCols - 1) `mod` numCols) curDir nss isP1 sent
+moveHighlight UIConst.Right (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s curRow ((curCol + 1) `mod` numCols) curDir nss isP1 sent
 
 
 moveHighlight _ gs = gs
@@ -467,5 +285,5 @@ startUI s isP1 = do
     writeBChan chan RemoteStatusUpdate
     threadDelay 100000
 
-  _ <- customMain initialVty builder (Just chan) app (SetupGameStateForUI [] s 0 0 UI.Right 2 (isP1) False)
+  _ <- customMain initialVty builder (Just chan) app (SetupGameStateForUI [] s 0 0 UIConst.Right 2 (isP1) False)
   putStrLn ""

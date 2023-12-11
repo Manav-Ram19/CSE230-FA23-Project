@@ -40,17 +40,12 @@ ghc-options:
 - -Wpartial-fields
 - -Wredundant-constraints
 
-# library:
-#   source-dirs: src
-#   exposed-modules:
-#   - BattleShipServerLoop
-#   - BattleShipClientLoop
 
 source-dirs:
 - ./src/
 - ./src/client/
+# - ./src/client/ClientUI/
 - ./src/server/
-
 executables:
   client:
     main: Main.hs

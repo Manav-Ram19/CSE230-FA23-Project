@@ -32,6 +32,8 @@ executable client
       ClientView
       GameClient
       UI
+      UIConst
+      UIDraw
       BattleShipServerLoop
       GameServer
       GameServerConfig
@@ -68,6 +70,8 @@ executable server
       ClientView
       GameClient
       UI
+      UIConst
+      UIDraw
       BattleShipServerLoop
       GameServer
       GameServerConfig
