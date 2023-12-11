@@ -156,10 +156,11 @@ draw (EndGameStateForUI isw) = [str $ endGameMessage isw]
     endGameMessage False = "You Lost."
 draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ C.hCenter grid <=> C.hCenter (padTop (Pad 4) turnBox)]
   where
-    grid = hBox [drawGrid mb "My Board" [], drawGrid ob "Opponents Board" [(curRow, curCol)]]
+    grid = hBox [drawGrid mb "My Board" [], drawGrid ob "Opponents Board" highlightedCells]
     mb = makePlayerBoard (myBoard lgs)
     ob = makeOpponentBoard (oppBoard lgs)
     turnBox = drawGameTurn (turn lgs) (amIP1 lgs)
+    highlightedCells = [(curRow, curCol) | isMyTurn (amIP1 lgs) (turn lgs)]
 
 -------------------- EVENTS -------------------
 
