@@ -224,7 +224,20 @@ handleEventSetupGame e = do
   sgsui <- get
   eventHandler e sgsui
   where
-    eventHandler :: BrickEvent Name e -> GameStateForUI -> EventM n GameStateForUI ()
+    eventHandler :: BrickEvent Name RemoteStatusUpdate -> GameStateForUI -> EventM n GameStateForUI ()
+    eventHandler(AppEvent RemoteStatusUpdate) sgsui@(SetupGameStateForUI ss s r c dir nss isP1) = do
+      if length ss < numShipsPerPlayer then pure ()
+      else do
+        -- Construct and return a GSUI
+        -- Send ships to opponent
+        _ <- liftIO $ sendToServer (SetShips ss) s
+        -- Get ships from opponent
+        oppShips <- liftIO $ getOpponentShips s
+        -- Create new local game state
+        let lgs = LocalGameState (Board ss []) (Board oppShips []) isP1 Player1 s
+        -- Create GSUI
+        let gsui = GameStateForUI lgs 0 0
+        put gsui
     eventHandler (VtyEvent (V.EvKey V.KUp [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UI.Up sgsui
     eventHandler (VtyEvent (V.EvKey V.KDown [])) sgsui@(SetupGameStateForUI {}) = do put $  moveHighlight UI.Down sgsui
     eventHandler (VtyEvent (V.EvKey V.KLeft [])) sgsui@(SetupGameStateForUI {}) = do put $  moveHighlight UI.Left sgsui
@@ -247,31 +260,23 @@ handleEventSetupGame e = do
                     UI.Down -> UI.Right
       let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1
       put newSGSUI
-    eventHandler (VtyEvent (V.EvKey V.KEnter [])) (SetupGameStateForUI ss s r c dir nss isP1) = do
-      -- Check if cell list crosses any boundaries
-      if isShipPlacementOutOfBounds (r, c) nss dir then pure ()
+    eventHandler (VtyEvent (V.EvKey V.KEnter [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1) = do
+      if length ss >= numShipsPerPlayer then pure ()
       else do
-      -- Generate cell list based on r c dir nss
-        let newShipPlacement = map (uncurry Cell) (getPositionsFromStartDirAndLen (r,c) nss dir)
-      -- Check if cell list has any cell already in ss
-        let isIntersectingWithOtherShips = foldr (\cell acc -> acc || isInList cell (concat ss)) False newShipPlacement
-        if isIntersectingWithOtherShips then pure ()
+        -- Check if cell list crosses any boundaries
+        if isShipPlacementOutOfBounds (r, c) nss dir then pure ()
         else do
-      -- Generate new sgsui
-          let newShips = ss ++ [newShipPlacement]
-          case numShipsToNextShipSize $ length newShips of
-            Just nextShipSize -> put (SetupGameStateForUI newShips s r c dir nextShipSize isP1)
-            Nothing -> do
-      -- Change to gsui if all ships have been placed
-              -- Send ships to opponent
-              _ <- liftIO $ sendToServer (SetShips newShips) s
-              -- Get ships from opponent
-              oppShips <- liftIO $ getOpponentShips s
-              -- Create new local game state
-              let lgs = LocalGameState (Board newShips []) (Board oppShips []) isP1 Player1 s
-              -- Create GSUI
-              let gsui = GameStateForUI lgs 0 0
-              put gsui
+        -- Generate cell list based on r c dir nss
+          let newShipPlacement = map (uncurry Cell) (getPositionsFromStartDirAndLen (r,c) nss dir)
+        -- Check if cell list has any cell already in ss
+          let isIntersectingWithOtherShips = foldr (\cell acc -> acc || isInList cell (concat ss)) False newShipPlacement
+          if isIntersectingWithOtherShips then pure ()
+          else do
+        -- Generate new sgsui
+            let newShips = ss ++ [newShipPlacement]
+            case numShipsToNextShipSize $ length newShips of
+              Just nextShipSize -> put (SetupGameStateForUI newShips s r c dir nextShipSize isP1)
+              Nothing -> put (SetupGameStateForUI newShips s r c dir 2 isP1) {- TODO: Remove this 2. Was added for UI testing -}
     eventHandler _ _ = pure ()
 
 isShipPlacementOutOfBounds:: (Int, Int) -> Int -> KeyDirection -> Bool
@@ -297,9 +302,9 @@ numShipsToNextShipSize :: Int -> Maybe Int
 numShipsToNextShipSize n
   | n == 0 = Just 2
   | n == 1 = Just 3
-  -- | n == 2 = Just 3
-  -- | n == 3 = Just 4
-  -- | n == 4 = Just 5
+  | n == 2 = Just 3
+  | n == 3 = Just 4
+  | n == 4 = Just 5
   | otherwise = Nothing
 
 handleEventPlayGame :: BrickEvent Name RemoteStatusUpdate -> EventM n GameStateForUI ()
@@ -334,7 +339,6 @@ isMyTurn False Player2 = True
 isMyTurn _ _ = False
 
 -- uses direction to upate game state to move current highlighted cell
--- TODO: Check why there is an extra row in output when moving highlight cell
 moveHighlight :: KeyDirection -> GameStateForUI -> GameStateForUI
 moveHighlight UI.Up (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((curRow + numRows - 1) `mod` numRows) curCol
 moveHighlight UI.Down (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((curRow + 1) `mod` numRows) curCol
