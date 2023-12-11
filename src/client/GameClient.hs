@@ -42,13 +42,16 @@ getOpponentShips h =
         else pure Nothing
 
 
-getGameStateUpdate :: Server -> IO (Cell, GameTurn)
+getGameStateUpdate :: Server -> IO (Maybe (Cell, GameTurn))
 getGameStateUpdate h =
     do
-        response <- getFromServer h
-        case response of
-            Just (ServerStateUpdate c t) -> pure (c, t)
-            _ -> error "Invalid api call to client. Expecting getServerStatusUpdate call."
+        resExists <- hWaitForInput h 1 {- 1 ms delay -}
+        if resExists then do
+            response <- getFromServer h
+            case response of
+                Just (ServerStateUpdate c t) -> pure $ Just (c, t)
+                _ -> error "Invalid api call to client. Expecting getServerStatusUpdate call."
+        else pure Nothing
 
 
 sendGameStateUpdate :: Server -> Cell -> GameTurn -> IO ()

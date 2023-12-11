@@ -18,27 +18,27 @@ import ClientInfra (initClientSocket)
 
 
 
-clientGameLoop :: LocalGameState -> Server -> IO LocalGameState
-clientGameLoop gs@(LocalGameState myb ob isP1 turn _server) server
-    | (isP1 && (turn == Player1)) || (not isP1 && (turn == Player2)) = do
-        (attackCell, b1, b2, newTurn) <- playTurn myb ob turn
-        let newGs = LocalGameState b1 b2 isP1 newTurn _server
-        sendGameStateUpdate server attackCell newTurn
-        clientGameLoop newGs server
-    | turn == GameOver = do
-        showClient gs
-        pure gs
-    | otherwise = do
-        (b1, b2, newTurn) <- opponentTurn server myb ob
-        let newGs = LocalGameState b1 b2 isP1 newTurn _server
-        showClient newGs
-        clientGameLoop newGs server
+-- clientGameLoop :: LocalGameState -> Server -> IO LocalGameState
+-- clientGameLoop gs@(LocalGameState myb ob isP1 turn _server) server
+--     | (isP1 && (turn == Player1)) || (not isP1 && (turn == Player2)) = do
+--         (attackCell, b1, b2, newTurn) <- playTurn myb ob turn
+--         let newGs = LocalGameState b1 b2 isP1 newTurn _server
+--         sendGameStateUpdate server attackCell newTurn
+--         clientGameLoop newGs server
+--     | turn == GameOver = do
+--         showClient gs
+--         pure gs
+--     | otherwise = do
+--         (b1, b2, newTurn) <- opponentTurn server myb ob
+--         let newGs = LocalGameState b1 b2 isP1 newTurn _server
+--         showClient newGs
+--         clientGameLoop newGs server
 
-opponentTurn :: Server -> Board -> Board -> IO (Board, Board, GameTurn)
-opponentTurn server myb opb = do
-    (myAttackedCell, turnUpdateFromOpponent) <- getGameStateUpdate server
-    let myNewBoard = Board (ships myb) (myAttackedCell : attackedCells myb)
-    pure (myNewBoard, opb, turnUpdateFromOpponent)
+-- opponentTurn :: Server -> Board -> Board -> IO (Board, Board, GameTurn)
+-- opponentTurn server myb opb = do
+--     (myAttackedCell, turnUpdateFromOpponent) <- getGameStateUpdate server
+--     let myNewBoard = Board (ships myb) (myAttackedCell : attackedCells myb)
+--     pure (myNewBoard, opb, turnUpdateFromOpponent)
 
 playTurn :: Board -> Board -> GameTurn -> IO (Cell, Board, Board, GameTurn)
 playTurn myb opb curTurn = do

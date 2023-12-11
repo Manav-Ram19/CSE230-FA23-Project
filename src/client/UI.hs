@@ -190,7 +190,7 @@ drawGameTurn gt p1 =
     render True = "Please make a move..."
 
 drawShipsRemaining :: [Ship] -> Widget n
-drawShipsRemaining myShips = 
+drawShipsRemaining myShips =
   hLimit 30 $
   vLimit 3 $
   withBorderStyle BS.unicodeRounded $
@@ -431,16 +431,19 @@ isWinner (LocalGameState _ opb _ GameOver _) = isSubset (concat $ ships opb) (at
 isWinner _ = False
 
 handleRemoteStatusUpdate :: GameStateForUI -> IO GameStateForUI
-handleRemoteStatusUpdate (GameStateForUI lgs r c) = do
+handleRemoteStatusUpdate gsui@(GameStateForUI lgs r c) = do
   let s = server lgs
   let myb = myBoard lgs
-  (myAttackedCell, turnUpdateFromOpponent) <- getGameStateUpdate s
-  let myNewBoard = Board (ships myb) (myAttackedCell : attackedCells myb)
-  let newLocalGameState = LocalGameState myNewBoard (oppBoard lgs) (amIP1 lgs) turnUpdateFromOpponent (server lgs)
-  let newgsui = case turnUpdateFromOpponent of
-        GameOver -> EndGameStateForUI (isWinner newLocalGameState)
-        _ -> GameStateForUI newLocalGameState r c
-  pure newgsui
+  response <- getGameStateUpdate s
+  case response of
+    Just (myAttackedCell, turnUpdateFromOpponent) -> do
+        let myNewBoard = Board (ships myb) (myAttackedCell : attackedCells myb)
+        let newLocalGameState = LocalGameState myNewBoard (oppBoard lgs) (amIP1 lgs) turnUpdateFromOpponent (server lgs)
+        let newgsui = case turnUpdateFromOpponent of
+              GameOver -> EndGameStateForUI (isWinner newLocalGameState)
+              _ -> GameStateForUI newLocalGameState r c
+        pure newgsui
+    Nothing -> pure gsui
 handleRemoteStatusUpdate gs = pure gs
 
 -------------------- APP --------------------
