@@ -21,7 +21,7 @@ import Control.Monad (forever, unless, when)
 import GHC.Conc (threadDelay)
 import ClientInfra (sendToServer)
 import ClientMessages (ClientMessages(SetShips))
-import Graphics.Vty (brightWhite, brightYellow, brightRed, brightGreen, brightBlack)
+import Graphics.Vty (brightWhite, brightYellow, brightRed, brightGreen, brightBlack, brightCyan)
 import Graphics.Vty.Attributes (black)
 
 -------------------- TYPES --------------------
@@ -56,6 +56,8 @@ ship :: AttrName
 ship      = attrName "ship"
 nothing :: AttrName
 nothing   = attrName "nothing"
+miss :: AttrName
+miss   = attrName "miss"
 
 myattrApp :: AttrMap
 myattrApp =
@@ -64,6 +66,7 @@ myattrApp =
     [ (highlight, fg brightYellow),
       (hit, fg brightRed),
       (ship, fg brightGreen),
+      (miss, fg brightCyan),
       (nothing, fg brightBlack)
     ]
 
@@ -82,27 +85,42 @@ drawCell (c, highlighted) =
     getCorrectAttr '.' = nothing
     getCorrectAttr 's' = ship
     getCorrectAttr 'x' = hit
+    getCorrectAttr 'm' = miss
     getCorrectAttr _   = nothing
     renderChar '.' = ' '
     renderChar 's' = 'S'
     renderChar 'x' = 'X'
+    renderChar 'm' = 'M'
     renderChar _   = ' '
 
+makeEmptyBoard :: [String]
+makeEmptyBoard = replicate 10 (replicate 10 '.')
 
-makeBoard :: Board -> Bool -> [String]
-makeBoard b isOpponentBoard = boardWithAttacks
-  where
-    boardWithAttacks = foldr (addCellToBoard 'x') (if isOpponentBoard then newBoard else boardWithPlayerShips) (attackedCells b)
-    boardWithPlayerShips = foldr (addCellToBoard 's') newBoard (concat (ships b))
-    newBoard = replicate 10 (replicate 10 '.')
-    addCellToBoard :: Char -> Cell -> [String] -> [String]
-    addCellToBoard c (Cell row col) curBoard = modifyListAtInd row (modifyListAtInd col c (getElemAtInd row [] curBoard)) curBoard
-    modifyListAtInd :: Int -> a -> [a] -> [a]
-    modifyListAtInd ind newVal oldList = take ind oldList ++ [newVal] ++ drop (ind + 1) oldList
-    getElemAtInd :: Int -> a -> [a] -> a
-    getElemAtInd _ defaultVal [] = defaultVal
-    getElemAtInd 0 _ l = head l
-    getElemAtInd n defaultVal (_ : ls) = getElemAtInd (n - 1) defaultVal ls
+makePlayerBoard :: Board -> [String]
+makePlayerBoard b = addHitsToBoard b $ addMissesToBoard b $ addShipsToBoard b makeEmptyBoard
+
+makeOpponentBoard :: Board -> [String]
+makeOpponentBoard b = addHitsToBoard b $ addMissesToBoard b makeEmptyBoard
+
+addShipsToBoard :: Board -> [String] -> [String]
+addShipsToBoard b board = foldr (addCellToBoard 's') board (concat (ships b))
+
+addHitsToBoard :: Board -> [String] -> [String]
+addHitsToBoard b board = foldr (addCellToBoard 'x') board (filter (\cell -> isInList cell (attackedCells b)) (concat (ships b)))
+
+addMissesToBoard :: Board -> [String] -> [String]
+addMissesToBoard b board = foldr (addCellToBoard 'm') board (attackedCells b)
+
+addCellToBoard :: Char -> Cell -> [String] -> [String]
+addCellToBoard c (Cell row col) curBoard = modifyListAtInd row (modifyListAtInd col c (getElemAtInd row [] curBoard)) curBoard
+
+modifyListAtInd :: Int -> a -> [a] -> [a]
+modifyListAtInd ind newVal oldList = take ind oldList ++ [newVal] ++ drop (ind + 1) oldList
+
+getElemAtInd :: Int -> a -> [a] -> a
+getElemAtInd _ defaultVal [] = defaultVal
+getElemAtInd 0 _ l = head l
+getElemAtInd n defaultVal (_ : ls) = getElemAtInd (n - 1) defaultVal ls
 
 drawGrid :: [[Char]] -> String -> [(Int, Int)] -> Widget n
 drawGrid grid label highLightedCells =
@@ -131,7 +149,7 @@ draw :: GameStateForUI -> [Widget a]
 draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _) = [C.vCenter (C.hCenter grid)]
   where
     grid = hBox [drawGrid mb "My Board" (getPositionsFromStartDirAndLen (curR, curC) shipSize curDir)]
-    mb = makeBoard (Board myShips []) False
+    mb = addShipsToBoard (Board myShips []) makeEmptyBoard
 draw (EndGameStateForUI isw) = [str $ endGameMessage isw]
   where
     endGameMessage True = "You Won!"
@@ -139,8 +157,8 @@ draw (EndGameStateForUI isw) = [str $ endGameMessage isw]
 draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ C.hCenter grid <=> C.hCenter (padTop (Pad 4) turnBox)]
   where
     grid = hBox [drawGrid mb "My Board" [], drawGrid ob "Opponents Board" [(curRow, curCol)]]
-    mb = makeBoard (myBoard lgs) False
-    ob = makeBoard (oppBoard lgs) True
+    mb = makePlayerBoard (myBoard lgs)
+    ob = makeOpponentBoard (oppBoard lgs)
     turnBox = drawGameTurn (turn lgs) (amIP1 lgs)
 
 -------------------- EVENTS -------------------
