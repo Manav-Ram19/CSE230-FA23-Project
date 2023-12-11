@@ -188,6 +188,16 @@ drawGameTurn gt p1 =
     render False = "Please wait for your opponent to miss..."
     render True = "Please make a move..."
 
+drawShipsRemaining :: [Ship] -> Widget n
+drawShipsRemaining myShips = 
+  hLimit 50 $
+  withBorderStyle BS.unicodeRounded $
+    B.borderWithLabel (str "Ships Remaining") $
+      hBox [fill ' ' , str (show (numShipsPerPlayer - (length myShips))), fill ' ']
+drawShipsRemaining _ = error "should not happen"
+
+
+
 drawTutorial :: Widget n
 drawTutorial =
   hLimit 50 $
@@ -199,6 +209,7 @@ drawTutorial =
                 ("Up", "↑"),
                 ("Right", "→"),
                 ("Down", "↓"),
+                ("Place Ship", "Enter"),
                 ("Clockwise Rotate", "x"),
                 ("CounterClockwise Rotate ", "y"),
                 ("Quit", "q")
@@ -225,7 +236,7 @@ drawEndGame True =
 
 draw :: GameStateForUI -> [Widget a]
 -- setup game state
-draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _) = [C.vCenter (C.hCenter drawTitle <=> C.hCenter grid <=> C.hCenter drawTutorial)]
+draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _) = [C.vCenter (C.hCenter drawTitle <=> C.hCenter grid <=> C.hCenter (drawShipsRemaining myShips) <=> C.hCenter drawTutorial)]
   where
     grid = hBox [drawGrid mb "My Board" (getPositionsFromStartDirAndLen (curR, curC) shipSize curDir)]
     mb = makePlayerBoard (Board myShips [])
