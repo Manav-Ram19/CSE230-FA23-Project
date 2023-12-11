@@ -2,7 +2,7 @@ module Main where
 
 import Prelude 
 import UI
-import GameClient (getInitialGameState, isPlayerOne)
+import GameClient (isPlayerOne)
 import ClientInfra (initClientSocket)
 import GameServerConfig (serverPort)
 

@@ -11,15 +11,15 @@ import ClientMessages
 import Text.Read (readMaybe)
 
 
-getInitialGameState :: Handle -> IO LocalGameState
-getInitialGameState h = do
-    isP1 <- isPlayerOne h
-    playerShips <- getShipsFromClient
-    sendToServer (SetShips playerShips) h
-    opponentShips <- getOpponentShips h
-    let localGameState = LocalGameState (Board playerShips []) (Board opponentShips []) isP1 Player1 h
-    showClient localGameState
-    pure localGameState
+-- getInitialGameState :: Handle -> IO LocalGameState
+-- getInitialGameState h = do
+--     isP1 <- isPlayerOne h
+--     playerShips <- getShipsFromClient
+--     sendToServer (SetShips playerShips) h
+--     opponentShips <- getOpponentShips h
+--     let localGameState = LocalGameState (Board playerShips []) (Board opponentShips []) isP1 Player1 h
+--     showClient localGameState
+--     pure localGameState
 
 isPlayerOne :: Server -> IO Bool
 isPlayerOne serverHandle = do
@@ -29,13 +29,17 @@ isPlayerOne serverHandle = do
         _ -> error "Invalid api call to client. Expecting getShips call."
 
 
-getOpponentShips :: Server -> IO [Ship]
+-- Non-Blocking Read
+getOpponentShips :: Server -> IO (Maybe [Ship])
 getOpponentShips h =
     do
-        response <- getFromServer h
-        case response of
-            Just (SendShips s) -> pure s
-            _ -> error "Invalid api call to client. Expecting getOpponentShips call."
+        resExists <- hWaitForInput h 1 {- 1 ms delay -}
+        if resExists then do
+            response <- getFromServer h
+            case response of
+                Just (SendShips s) -> pure $ Just s
+                _ -> error "Invalid api call to client. Expecting getOpponentShips call."
+        else pure Nothing
 
 
 getGameStateUpdate :: Server -> IO (Cell, GameTurn)

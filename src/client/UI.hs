@@ -21,17 +21,18 @@ import qualified Graphics.Vty as V
 import Graphics.Vty.Attributes (black)
 import Types
 
--------------------- TYPES & CONSTANTS --------------------
-data GameStateForUI
-  = SetupGameStateForUI
-      { _setupships :: [Ship],
-        _setupserver :: Server,
-        _setupcurrRow :: Int,
-        _setupcurrCol :: Int,
-        _setupcurrDirection :: KeyDirection,
-        _nextShipSize :: Int,
-        _isP1 :: Bool
-      }
+-------------------- TYPES --------------------
+data GameStateForUI =
+  SetupGameStateForUI {
+    _setupships :: [Ship],
+    _setupserver :: Server,
+    _setupcurrRow :: Int,
+    _setupcurrCol :: Int,
+    _setupcurrDirection :: KeyDirection,
+    _nextShipSize :: Int,
+    _isP1 :: Bool,
+    _sentShipsToServer :: Bool
+  }
   | GameStateForUI
       { _localGameState :: LocalGameState,
         _currRow :: Int,
@@ -190,10 +191,11 @@ drawGameTurn gt p1 =
 
 drawShipsRemaining :: [Ship] -> Widget n
 drawShipsRemaining myShips = 
-  hLimit 50 $
+  hLimit 30 $
+  vLimit 3 $
   withBorderStyle BS.unicodeRounded $
-    B.borderWithLabel (str "Ships Remaining") $
-      hBox [fill ' ' , str (show (numShipsPerPlayer - (length myShips))), fill ' ']
+    B.borderWithLabel (str "Ships Left") $
+      hBox [fill ' ', str (show (numShipsPerPlayer - (length myShips))), fill ' ']
 drawShipsRemaining _ = error "should not happen"
 
 
@@ -236,7 +238,7 @@ drawEndGame True =
 
 draw :: GameStateForUI -> [Widget a]
 -- setup game state
-draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _) = [C.vCenter (C.hCenter drawTitle <=> C.hCenter grid <=> C.hCenter (drawShipsRemaining myShips) <=> C.hCenter drawTutorial)]
+draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _ _) = [C.vCenter (C.hCenter drawTitle <=> C.hCenter grid <=> C.hCenter (drawShipsRemaining myShips) <=> C.hCenter drawTutorial)]
   where
     grid = hBox [drawGrid mb "My Board" (getPositionsFromStartDirAndLen (curR, curC) shipSize curDir)]
     mb = makePlayerBoard (Board myShips [])
@@ -269,69 +271,72 @@ handleEventSetupGame e = do
   eventHandler e sgsui
   where
     eventHandler :: BrickEvent Name RemoteStatusUpdate -> GameStateForUI -> EventM n GameStateForUI ()
-    eventHandler (AppEvent RemoteStatusUpdate) sgsui@(SetupGameStateForUI ss s r c dir nss isP1) = do
-      if length ss < numShipsPerPlayer
-        then pure ()
-        else do
-          -- Construct and return a GSUI
-          -- Send ships to opponent
-          _ <- liftIO $ sendToServer (SetShips ss) s
-          -- Get ships from opponent
-          oppShips <- liftIO $ getOpponentShips s
+    eventHandler(AppEvent RemoteStatusUpdate) sgsui@(SetupGameStateForUI ss s r c dir nss isP1 sent) = do
+      if length ss < numShipsPerPlayer then pure ()
+      else do
+        -- Construct and return a GSUI
+        -- Get ships from opponent
+        maybeoppShips <- liftIO $ getOpponentShips s
+        case maybeoppShips of
+          Just oppShips -> do
           -- Create new local game state
-          let lgs = LocalGameState (Board ss []) (Board oppShips []) isP1 Player1 s
-          -- Create GSUI
-          let gsui = GameStateForUI lgs 0 0
-          put gsui
+            let lgs = LocalGameState (Board ss []) (Board oppShips []) isP1 Player1 s
+            -- Create GSUI
+            let gsui = GameStateForUI lgs 0 0
+            put gsui
+          _ -> pure ()
     eventHandler (VtyEvent (V.EvKey V.KUp [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UI.Up sgsui
     eventHandler (VtyEvent (V.EvKey V.KDown [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UI.Down sgsui
     eventHandler (VtyEvent (V.EvKey V.KLeft [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UI.Left sgsui
     eventHandler (VtyEvent (V.EvKey V.KRight [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UI.Right sgsui
     -- Clockwise Rotation
-    eventHandler (VtyEvent (V.EvKey (V.KChar 'z') [])) (SetupGameStateForUI ss s r c dir nss isP1) = do
+    eventHandler (VtyEvent (V.EvKey (V.KChar 'z') [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1 sent) = do
       let newDir = case dir of
-            UI.Left -> UI.Up
-            UI.Up -> UI.Right
-            UI.Right -> UI.Down
-            UI.Down -> UI.Left
-      let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1
+                    UI.Left -> UI.Up
+                    UI.Up -> UI.Right
+                    UI.Right -> UI.Down
+                    UI.Down -> UI.Left
+      let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1 sent
       put newSGSUI
     -- Anti-Clockwise Rotation
-    eventHandler (VtyEvent (V.EvKey (V.KChar 'x') [])) (SetupGameStateForUI ss s r c dir nss isP1) = do
+    eventHandler (VtyEvent (V.EvKey (V.KChar 'x') [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1 sent) = do
       let newDir = case dir of
-            UI.Left -> UI.Down
-            UI.Up -> UI.Left
-            UI.Right -> UI.Up
-            UI.Down -> UI.Right
-      let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1
+                    UI.Left -> UI.Down
+                    UI.Up -> UI.Left
+                    UI.Right -> UI.Up
+                    UI.Down -> UI.Right
+      let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1 sent
       put newSGSUI
-    eventHandler (VtyEvent (V.EvKey V.KEnter [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1) = do
-      if length ss >= numShipsPerPlayer
-        then pure ()
+    eventHandler (VtyEvent (V.EvKey V.KEnter [])) sgsui@(SetupGameStateForUI ss s r c dir nss isP1 sent) = do
+      if length ss >= numShipsPerPlayer then pure ()
+      else do
+        -- Check if cell list crosses any boundaries
+        if isShipPlacementOutOfBounds (r, c) nss dir then pure ()
         else do
-          -- Check if cell list crosses any boundaries
-          if isShipPlacementOutOfBounds (r, c) nss dir
-            then pure ()
-            else do
-              -- Generate cell list based on r c dir nss
-              let newShipPlacement = map (uncurry Cell) (getPositionsFromStartDirAndLen (r, c) nss dir)
-              -- Check if cell list has any cell already in ss
-              let isIntersectingWithOtherShips = foldr (\cell acc -> acc || isInList cell (concat ss)) False newShipPlacement
-              if isIntersectingWithOtherShips
-                then pure ()
-                else do
-                  -- Generate new sgsui
-                  let newShips = ss ++ [newShipPlacement]
-                  case numShipsToNextShipSize $ length newShips of
-                    Just nextShipSize -> put (SetupGameStateForUI newShips s r c dir nextShipSize isP1)
-                    Nothing -> put (SetupGameStateForUI newShips s r c dir 2 isP1 {- TODO: Remove this 2. Was added for UI testing -})
+        -- Generate cell list based on r c dir nss
+          let newShipPlacement = map (uncurry Cell) (getPositionsFromStartDirAndLen (r,c) nss dir)
+        -- Check if cell list has any cell already in ss
+          let isIntersectingWithOtherShips = foldr (\cell acc -> acc || isInList cell (concat ss)) False newShipPlacement
+          if isIntersectingWithOtherShips then pure ()
+          else do
+        -- Generate new sgsui
+            let newShips = ss ++ [newShipPlacement]
+            case numShipsToNextShipSize $ length newShips of
+              Just nextShipSize -> put (SetupGameStateForUI newShips s r c dir nextShipSize isP1 sent)
+              Nothing -> do
+                -- No ships left to add, so send to server if i haven't sent before
+                if not sent then do
+                  liftIO $ sendToServer (SetShips newShips) s
+                  put (SetupGameStateForUI newShips s r c dir 0 isP1 True)
+                else
+                  put (SetupGameStateForUI newShips s r c dir 0 isP1 sent)
     eventHandler _ _ = pure ()
 
-isShipPlacementOutOfBounds :: (Int, Int) -> Int -> KeyDirection -> Bool
-isShipPlacementOutOfBounds (startR, _) shipLen UI.Up = startR - shipLen + 1 < 0
-isShipPlacementOutOfBounds (startR, _) shipLen UI.Down = startR + shipLen - 1 >= numRows
-isShipPlacementOutOfBounds (_, startC) shipLen UI.Left = startC - shipLen + 1 < 0
-isShipPlacementOutOfBounds (_, startC) shipLen UI.Right = startC + shipLen - 1 >= numCols
+isShipPlacementOutOfBounds:: (Int, Int) -> Int -> KeyDirection -> Bool
+isShipPlacementOutOfBounds (startR, startC) shipLen UI.Up = startR - shipLen + 1 < 0
+isShipPlacementOutOfBounds (startR, startC) shipLen UI.Down = startR + shipLen - 1 >= numRows
+isShipPlacementOutOfBounds (startR, startC) shipLen UI.Left = startC - shipLen + 1 < 0
+isShipPlacementOutOfBounds (startR, startC) shipLen UI.Right = startC + shipLen - 1 >= numCols
 
 getPositionsFromStartDirAndLen :: (Int, Int) -> Int -> KeyDirection -> [(Int, Int)]
 getPositionsFromStartDirAndLen _ 0 _ = []
@@ -392,10 +397,13 @@ moveHighlight UI.Up (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((cu
 moveHighlight UI.Down (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((curRow + 1) `mod` numRows) curCol
 moveHighlight UI.Left (GameStateForUI lgs curRow curCol) = GameStateForUI lgs curRow ((curCol + numCols - 1) `mod` numCols)
 moveHighlight UI.Right (GameStateForUI lgs curRow curCol) = GameStateForUI lgs curRow ((curCol + 1) `mod` numCols)
-moveHighlight UI.Up (SetupGameStateForUI ss s curRow curCol curDir nss isP1) = SetupGameStateForUI ss s ((curRow + numRows - 1) `mod` numRows) curCol curDir nss isP1
-moveHighlight UI.Down (SetupGameStateForUI ss s curRow curCol curDir nss isP1) = SetupGameStateForUI ss s ((curRow + 1) `mod` numRows) curCol curDir nss isP1
-moveHighlight UI.Left (SetupGameStateForUI ss s curRow curCol curDir nss isP1) = SetupGameStateForUI ss s curRow ((curCol + numCols - 1) `mod` numCols) curDir nss isP1
-moveHighlight UI.Right (SetupGameStateForUI ss s curRow curCol curDir nss isP1) = SetupGameStateForUI ss s curRow ((curCol + 1) `mod` numCols) curDir nss isP1
+
+moveHighlight UI.Up (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s ((curRow + numRows - 1) `mod` numRows) curCol curDir nss isP1 sent
+moveHighlight UI.Down (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s ((curRow + 1) `mod` numRows) curCol curDir nss isP1 sent
+moveHighlight UI.Left (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s curRow ((curCol + numCols - 1) `mod` numCols) curDir nss isP1 sent
+moveHighlight UI.Right (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s curRow ((curCol + 1) `mod` numCols) curDir nss isP1 sent
+
+
 moveHighlight _ gs = gs
 
 handleEnter :: GameStateForUI -> IO GameStateForUI
@@ -456,5 +464,5 @@ startUI s isP1 = do
     writeBChan chan RemoteStatusUpdate
     threadDelay 100000
 
-  _ <- customMain initialVty builder (Just chan) app (SetupGameStateForUI [] s 0 0 UI.Right 2 (isP1))
+  _ <- customMain initialVty builder (Just chan) app (SetupGameStateForUI [] s 0 0 UI.Right 2 (isP1) False)
   putStrLn ""

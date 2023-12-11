@@ -9,12 +9,12 @@ import ClientInfra (initClientSocket)
 
 
 
-startGame :: HostName -> IO ()
-startGame hostName = do
-    h <- initClientSocket hostName serverPort
-    igs <- getInitialGameState h
-    _ <- clientGameLoop igs h
-    pure ()
+-- startGame :: HostName -> IO ()
+-- startGame hostName = do
+--     h <- initClientSocket hostName serverPort
+--     igs <- getInitialGameState h
+--     _ <- clientGameLoop igs h
+--     pure ()
 
 
 

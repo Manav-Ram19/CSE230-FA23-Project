@@ -55,17 +55,17 @@ getBoard isplayerOne player = do
     response <- getFromClient player
     case response of
         Just (SetShips s) -> pure (Board s [])
-        _ -> error "Invalid api call to Server. Expecting SetShips call."
+        _ -> error ("Invalid api call to Server. Expecting SetShips call. Got: " ++ show response)
 
 makeInitialGameState :: Player -> Player -> GameState
 makeInitialGameState p1 p2 = GameState p1 p2 Player1
 
 getGameUpdateFromPlayer :: Player -> IO (Cell, GameTurn)
-getGameUpdateFromPlayer playerHandle= do
+getGameUpdateFromPlayer playerHandle = do
     clientMsg <- getFromClient playerHandle
     case clientMsg of
         Just (ClientStateUpdate c t) -> pure (c, t)
-        _ -> error "Invalid message from client. Expecting cell."
+        _ -> error ("Invalid message from client. Expecting cell. Got: " ++ show clientMsg)
 
 sendGameUpdateToPlayer :: Player -> Cell -> GameTurn -> IO ()
 sendGameUpdateToPlayer playerHandle c t = do
