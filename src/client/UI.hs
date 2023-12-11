@@ -58,6 +58,10 @@ nothing :: AttrName
 nothing   = attrName "nothing"
 cyan :: AttrName
 cyan   = attrName "cyan"
+red :: AttrName
+red   = attrName "red"
+green :: AttrName
+green   = attrName "green"
 
 myattrApp :: AttrMap
 myattrApp =
@@ -67,11 +71,38 @@ myattrApp =
       (hit, fg brightRed),
       (ship, fg brightGreen),
       (nothing, fg brightBlack),
-      (cyan, fg brightCyan)
+      (cyan, fg brightCyan), 
+      (red, fg brightRed), 
+      (green, fg brightGreen)
     ]
 
+battleshipText :: String
+battleshipText = "\n\
+\.______        ___   .___________.___________. __       _______     _______. __    __   __  .______   \n\
+\|   _  \\      /   \\  |           |           ||  |     |   ____|   /       ||  |  |  | |  | |   _  \n\  
+\|  |_)  |    /  ^  \\ `---|  |----`---|  |----`|  |     |  |__     |   (----`|  |__|  | |  | |  |_)  | \n\
+\|   _  <    /  /_\\  \\    |  |        |  |     |  |     |   __|     \\   \\    |   __   | |  | |   ___/ \n\ 
+\|  |_)  |  /  _____  \\   |  |        |  |     |  `----.|  |____.----)   |   |  |  |  | |  | |  |      \n\
+\|______/  /__/     \\__\\  |__|        |__|     |_______||_______|_______/    |__|  |__| |__| | _|  \n"
+
+youLoseText:: String
+youLoseText = "\n\
+\____    ____  ______    __    __     __        ______        _______. _______ \n\
+\\\   \\  /   / /  __  \\  |  |  |  |   |  |      /  __  \\      \\/       ||   ____| \n\
+\ \\   \\/   / |  |  |  | |  |  |  |   |  |     |  |  |  |    |   (----`|  |__   \n\
+\  \\_    _/  |  |  |  | |  |  |  |   |  |     |  |  |  |     \\   \\    |   __|  \n\
+\    |  |    |  `--'  | |  `--'  |   |  `----.|  `--'  | .----)   |   |  |____ \n\
+\    |__|     \\______/   \\______/    |_______| \\______/  |_______/    |_______|\n"
 
 
+youWinText:: String
+youWinText = "\n\
+\____    ____  ______    __    __    ____    __    ____  __  .__   __. \n\
+\\\   \\  /   / /  __  \\  |  |  |  |   \\   \\  /  \\  /   / |  | |  \\ |  | \n\
+\ \\   \\/   / |  |  |  | |  |  |  |    \\   \\/    \\/   /  |  | |   \\|  | \n\
+\  \\_    _/  |  |  |  | |  |  |  |     \\            /   |  | |  . `  | \n\
+\    |  |    |  `--'  | |  `--'  |      \\    /\\    /    |  | |  |\\   | \n\
+\    |__|     \\______/   \\______/        \\__/  \\__/     |__| |__| \\__| "
 data RemoteStatusUpdate = RemoteStatusUpdate
 
 -------------------- DRAWS --------------------
@@ -129,18 +160,17 @@ drawGameTurn gt p1 =
       render False = "Please wait for your opponent to miss..."
       render True = "Please make a move..."
 
-battleshipText = "\n\
-\.______        ___   .___________.___________. __       _______     _______. __    __   __  .______   \n\
-\|   _  \\      /   \\  |           |           ||  |     |   ____|   /       ||  |  |  | |  | |   _  \n\  
-\|  |_)  |    /  ^  \\ `---|  |----`---|  |----`|  |     |  |__     |   (----`|  |__|  | |  | |  |_)  | \n\
-\|   _  <    /  /_\\  \\    |  |        |  |     |  |     |   __|     \\   \\    |   __   | |  | |   ___/ \n\ 
-\|  |_)  |  /  _____  \\   |  |        |  |     |  `----.|  |____.----)   |   |  |  |  | |  | |  |      \n\
-\|______/  /__/     \\__\\  |__|        |__|     |_______||_______|_______/    |__|  |__| |__| | _|  \n"
 
 drawTitle :: Widget n
 drawTitle = 
   overrideAttr B.borderAttr cyan $ B.border $ 
     vBox [  C.hCenter $ padAll 1 (str (battleshipText))]
+drawEndGame :: Bool -> Widget n 
+drawEndGame False = overrideAttr B.borderAttr red $ B.border $ 
+  vBox [C.hCenter $ padAll 1 (str (youLoseText))]
+
+drawEndGame True = overrideAttr B.borderAttr green $ B.border $ 
+  vBox [C.hCenter $ padAll 1 (str (youWinText))]
 
 draw :: GameStateForUI -> [Widget a]
 -- setup game state
@@ -150,10 +180,7 @@ draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _) = [C.vCenter (C
     mb = makeBoard (Board myShips []) False
 
 -- end game state
-draw (EndGameStateForUI isw) = [str $ endGameMessage isw]
-  where
-    endGameMessage True = "You Won!"
-    endGameMessage False = "You Lost."
+draw (EndGameStateForUI isw) = [C.vCenter $ C.hCenter (drawEndGame isw)]
 
 --  during game
 draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ drawTitle <=> C.hCenter grid <=> C.hCenter (padTop (Pad 4) turnBox)]
