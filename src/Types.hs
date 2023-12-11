@@ -6,7 +6,13 @@ numRows :: Int
 numRows = 10
 numCols :: Int
 numCols = 10
-data Cell = Cell Int Int deriving(Eq, Show, Read)
+numShipsPerPlayer :: Int
+numShipsPerPlayer = 5
+data Cell = Cell {
+    row :: Int,
+    col :: Int
+ } deriving(Eq, Show, Read)
+
 type Ship = [Cell]
 
 data Board = Board {
