@@ -31,7 +31,6 @@ type Name = ()
 
 data KeyDirection = Left | Right | Up | Down
 
-
 highlight :: AttrName
 highlight = attrName "highlight"
 hit :: AttrName
@@ -41,14 +40,6 @@ ship      = attrName "ship"
 nothing :: AttrName
 nothing   = attrName "nothing"
 
-
-
-highlightBorderAttr, defaultAttr :: AttrName
-highlightBorderAttr = attrName "highlightBorderAttr"
-defaultAttr = attrName "default"
-
--- tictactoeAttrMap = attrMap V.defAttr [(highlightBorderAttr, U.fg V.cyan)]
-
 myattrApp :: AttrMap
 myattrApp =
   attrMap
@@ -57,7 +48,6 @@ myattrApp =
       (hit, fg brightRed),
       (ship, fg brightGreen),
       (nothing, fg brightBlack)
-      -- (highlightBorderAttr, fg V.cyan)
     ]
 
 
@@ -99,7 +89,7 @@ makeBoard b isOpponentBoard = boardWithAttacks
 
 drawGrid :: [String] -> String -> Int -> Int -> Widget n
 drawGrid grid label hRowId hColId =
-  withBorderStyle BS.unicodeBold $ B.borderWithLabel (str label) $
+   withBorderStyle BS.unicodeBold $ B.borderWithLabel (str label) $
     vBox $
       map (hBox . map drawCell) gridWithHighLightBool
   where
@@ -120,15 +110,14 @@ drawGameTurn gt p1 =
       render True = "Please make a move..."
 
 
-
 draw :: GameStateForUI -> [Widget a]
 draw (EndGameStateForUI isw) = [str $ endGameMessage isw]
   where
     endGameMessage True = "You Won!"
     endGameMessage False = "You Lost."
-draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ C.hCenter grid <=> C.hCenter (padTop (Pad 5) turnBox)]
+draw (GameStateForUI lgs curRow curCol) = [C.vCenter $ C.hCenter grid <=> C.hCenter (padTop (Pad 4) turnBox)]
   where
-    grid = hBox [drawGrid mb "My Board" (-1) (-1), drawGrid ob "Opponents Board" curRow curCol]
+    grid = hBox [padAll 1 (drawGrid mb "My Board" (-1) (-1)), padAll 1 (drawGrid ob "Opponents Board" curRow curCol)]
     mb = makeBoard (myBoard lgs) False
     ob = makeBoard (oppBoard lgs) True
     turnBox = drawGameTurn (turn lgs) (amIP1 lgs)
