@@ -1,7 +1,11 @@
 module BattleShipServerLoop (startBattleShipServer) where
     
 import Types
+    ( GameState(GameState), GameTurn(GameOver, Player1, Player2) )
 import GameServer
+    ( startGameServer,
+      getGameUpdateFromPlayer,
+      sendGameUpdateToPlayer )
 
 startBattleShipServer :: IO ()
 startBattleShipServer = do

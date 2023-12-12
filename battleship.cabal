@@ -25,12 +25,12 @@ executable client
   main-is: Main.hs
   other-modules:
       ClientMessages
+      Common
       ServerMessages
       Types
-      BattleShipClientLoop
       ClientInfra
-      ClientView
       GameClient
+      GameLogic
       UI
       UIConst
       UIDraw
@@ -63,12 +63,12 @@ executable server
   main-is: Main.hs
   other-modules:
       ClientMessages
+      Common
       ServerMessages
       Types
-      BattleShipClientLoop
       ClientInfra
-      ClientView
       GameClient
+      GameLogic
       UI
       UIConst
       UIDraw

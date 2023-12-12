@@ -6,14 +6,28 @@ module ServerInfra (
     getFromClient
 ) where
 import Network.Socket
+    ( socketToHandle,
+      defaultHints,
+      getAddrInfo,
+      setSocketOption,
+      accept,
+      bind,
+      listen,
+      socket,
+      defaultProtocol,
+      AddrInfo(addrAddress, addrFlags, addrSocketType, addrFamily),
+      AddrInfoFlag(AI_PASSIVE),
+      SocketOption(ReuseAddr),
+      Socket,
+      SocketType(Stream) )
 import GHC.IO.IOMode (IOMode(ReadWriteMode))
 import GHC.IO.Handle
+    ( Handle, hSetBuffering, hGetLine, BufferMode(LineBuffering) )
 import Control.Concurrent (forkIO)
-import ServerMessages
-import ClientMessages
-import Text.Read
-import Types
-import GHC.IO.Handle.Text
+import ServerMessages ( encodeServerMessage, ServerMessage )
+import ClientMessages ( decodeClientMessage, ClientMessages )
+import Types ( Port )
+import GHC.IO.Handle.Text ( hPutStrLn )
 
 type ConnectionCallBack = [Handle] -> IO ()
 type NumBufferedConnectionsBeforeCallBack = Int

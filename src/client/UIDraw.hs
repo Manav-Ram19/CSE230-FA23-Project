@@ -1,4 +1,4 @@
-module UIDraw (drawGrid, drawTitle, drawShipsRemaining, drawTutorial, drawGameTurn, drawEndGame ) where
+module UIDraw (drawSetupPhase, drawEndGamePhase, drawGrid, drawTitle, drawShipsRemaining, drawTutorial, drawGameTurn, drawGamePhase) where
 import Brick (Widget)
 import Brick.Widgets.Core
     ( overrideAttr,
@@ -13,14 +13,41 @@ import Brick.Widgets.Core
       (<+>),
       vBox,
       padAll,
-      hLimit )
+      hLimit,
+      (<=>),
+      padTop )
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Border.Style as BS
 import qualified Brick.Widgets.Center as C
+import Common (isInList)
 import UIConst (highlight, nothing, ship, miss, hit, battleshipText, cyan, red, youLoseText, green, youWinText)
-import BattleShipClientLoop (isInList)
 import Types (numRows, numCols)
 
+---------- DRAWING PHASES ----------
+
+drawSetupPhase :: [String] -> [(Int, Int)] -> Int -> [Widget a]
+drawSetupPhase b highLightedCells numShipsRemaining = [C.vCenter (C.hCenter drawTitle <=> C.hCenter grid <=> C.hCenter (drawShipsRemaining numShipsRemaining) <=> C.hCenter drawTutorial)]
+  where
+    grid = hBox [drawGrid b "My Board" highLightedCells]
+
+drawEndGamePhase :: Bool -> [Widget a]
+drawEndGamePhase isw = [C.vCenter $ C.hCenter (drawEndGame isw)]
+  where
+    drawEndGame :: Bool -> Widget n
+    drawEndGame False =
+      overrideAttr B.borderAttr red $
+        B.border $
+          vBox [C.hCenter $ padAll 1 (str youLoseText)]
+    drawEndGame True =
+      overrideAttr B.borderAttr green $
+        B.border $
+          vBox [C.hCenter $ padAll 1 (str youWinText)]
+
+drawGamePhase :: [String] -> [String] -> [(Int, Int)] -> Bool -> [Widget a]
+drawGamePhase mb ob highlightedCells isPTurn = [C.vCenter $ drawTitle <=> C.hCenter grid <=> C.hCenter (padTop (Pad 4) turnBox)]
+  where
+    turnBox = drawGameTurn isPTurn
+    grid = hBox [drawGrid mb "My Board" [], drawGrid ob "Opponents Board" highlightedCells]
 
 ---------- DRAWINGS GRIDS ----------
 drawCell :: (Char, Bool) -> Widget n
@@ -103,15 +130,3 @@ drawGameTurn myTurn =
   where
     render False = "Please wait for your opponent to miss..."
     render True = "Please make a move..."
-
----------- Game Over ----------
-
-drawEndGame :: Bool -> Widget n
-drawEndGame False =
-  overrideAttr B.borderAttr red $
-    B.border $
-      vBox [C.hCenter $ padAll 1 (str youLoseText)]
-drawEndGame True =
-  overrideAttr B.borderAttr green $
-    B.border $
-      vBox [C.hCenter $ padAll 1 (str youWinText)]

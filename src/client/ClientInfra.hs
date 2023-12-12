@@ -1,4 +1,6 @@
-module ClientInfra where
+module ClientInfra (
+    initClientSocket, createSocket, sendToServer, getFromServer
+) where
 
 import Network.Socket (AddrInfo (addrSocketType, addrFamily, addrAddress), getAddrInfo, defaultHints, SocketType (Stream), socket, setSocketOption, SocketOption (KeepAlive), connect, socketToHandle)
 import Types (Port)

@@ -1,4 +1,18 @@
-module Types where
+module Types (
+    numRows,
+    numCols,
+    numShipsPerPlayer,
+    Cell (..),
+    Ship,
+    Board (..),
+    Player,
+    GameTurn (..),
+    GameState (..),
+    Port,
+    LocalGameState (..),
+    Server,
+    ClientGameLoopCallBack
+) where
 import GHC.IO.Handle (Handle)
 
 
@@ -18,7 +32,7 @@ type Ship = [Cell]
 data Board = Board {
     ships :: [Ship],
     attackedCells :: [Cell]
-} deriving (Show)
+} deriving (Show, Eq)
 
 type Player = Handle
 
@@ -38,7 +52,7 @@ data LocalGameState = LocalGameState {
     amIP1 :: Bool,
     turn :: GameTurn, 
     server :: Server
-} deriving (Show)
+} deriving (Show, Eq)
 
 type Server = Handle
 type ClientGameLoopCallBack = (LocalGameState -> Server -> IO LocalGameState)

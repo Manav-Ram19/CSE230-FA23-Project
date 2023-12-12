@@ -1,5 +1,9 @@
-module ClientMessages where
-import Types
+module ClientMessages (
+    encodeClientMessage,
+    decodeClientMessage,
+    ClientMessages (..)
+) where
+import Types ( Cell, GameTurn, Ship )
 import Text.Read (readMaybe)
 
 data ClientMessages = 

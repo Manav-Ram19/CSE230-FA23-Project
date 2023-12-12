@@ -1,5 +1,5 @@
 module UIConst (
- Name, GameStateForUI(..), RemoteStatusUpdate(..),  KeyDirection(..),  highlight, hit, ship, nothing, cyan, red, green, miss, myattrApp, battleshipText, youLoseText, youWinText
+ Name, GameStateForUI(..), RemoteStatusUpdate(..),  Direction(..),  highlight, hit, ship, nothing, cyan, red, green, miss, myattrApp, battleshipText, youLoseText, youWinText
 )where
 import Types (Ship, Server, LocalGameState)
 import Brick (AttrName, AttrMap, attrMap)
@@ -17,7 +17,7 @@ data GameStateForUI =
     _setupserver :: Server,
     _setupcurrRow :: Int,
     _setupcurrCol :: Int,
-    _setupcurrDirection :: KeyDirection,
+    _setupcurrDirection :: Direction,
     _nextShipSize :: Int,
     _isP1 :: Bool,
     _sentShipsToServer :: Bool
@@ -29,9 +29,9 @@ data GameStateForUI =
       }
   | EndGameStateForUI
       { _didClientWin :: Bool
-      }
+      } deriving (Eq)
 
-data KeyDirection = Left | Right | Up | Down
+data Direction = Left | Right | Up | Down deriving (Eq)
 
 data RemoteStatusUpdate = RemoteStatusUpdate
 

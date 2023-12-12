@@ -1,15 +1,17 @@
-module Main where 
+module Main (
+    main
+) where 
 
 import Prelude 
 import UI
-import GameClient (isPlayerOne)
+import GameClient (getIsPlayerOne)
 import ClientInfra (initClientSocket)
-import GameServerConfig (serverPort)
+import GameServerConfig (serverPort, serverIP)
 
 main :: IO ()
 main = do 
-    h <- initClientSocket "127.0.0.1" serverPort
-    isP1 <- isPlayerOne h
+    h <- initClientSocket serverIP serverPort
+    isP1 <- getIsPlayerOne h
     startUI h isP1
 
 

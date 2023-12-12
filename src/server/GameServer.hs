@@ -4,14 +4,21 @@ module GameServer (
     sendGameUpdateToPlayer
 ) where
 
-import ServerInfra
-import GHC.IO.Handle
-import GHC.Conc
-import Control.Concurrent.Async
+import ServerInfra ( getFromClient, initServer, sendToClient )
+import GHC.IO.Handle ( Handle, hClose )
+import GHC.Conc ()
+import Control.Concurrent.Async ( async, wait )
 import Types
+    ( Board(Board, ships),
+      Cell,
+      GameState(GameState),
+      GameTurn(Player1),
+      Player )
 import ServerMessages
+    (ServerMessage(ServerStateUpdate, SendShips, GetShips) )
 import ClientMessages
-import GameServerConfig
+    ( ClientMessages(ClientStateUpdate, SetShips) )
+import GameServerConfig ( serverPort )
 
 numPlayersPerGame :: Int
 numPlayersPerGame = 2
@@ -49,7 +56,7 @@ execGame gameloop p1 p2 = do
     hClose p2 -- Close connections since game is over
     {- Should we make these async calls? -}
 
-getBoard :: IsPlayerOne -> NewPlayer -> IO Board
+getBoard :: Bool -> NewPlayer -> IO Board
 getBoard isplayerOne player = do
     sendToClient (GetShips isplayerOne) player
     response <- getFromClient player

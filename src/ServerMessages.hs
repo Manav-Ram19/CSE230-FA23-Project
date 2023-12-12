@@ -1,5 +1,9 @@
-module ServerMessages where
-import Types
+module ServerMessages (
+    ServerMessage (..),
+    encodeServerMessage,
+    decodeServerMessage
+) where
+import Types ( Cell, GameTurn, Ship )
 import Text.Read (readMaybe)
 
 type IsPlayerOne = Bool
