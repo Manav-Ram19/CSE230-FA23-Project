@@ -9,7 +9,7 @@ import Text.Read (readMaybe)
 data ClientMessages = 
     SetShips [Ship] |
     ClientStateUpdate Cell GameTurn
-    deriving (Show, Read)
+    deriving (Show, Read, Eq)
 
 decodeClientMessage :: String -> Maybe ClientMessages
 decodeClientMessage s = readMaybe s :: Maybe ClientMessages

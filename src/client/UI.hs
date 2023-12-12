@@ -8,7 +8,7 @@ import GameLogic
       getPositionsFromStartDirAndLen,
       execPlayerTurn,
       execOpponentTurn )
-import Common (modifyListAtInd, getElemAtInd, isInList)
+import Common (modifyListAtInd, getElemAtInd, contains)
 import UIConst (RemoteStatusUpdate (..), GameStateForUI (..), Name, Direction (..), myattrApp)
 import UIDraw
     ( drawEndGamePhase, drawSetupPhase, drawGamePhase )
@@ -54,7 +54,7 @@ addShipsToBoard :: Board -> [String] -> [String]
 addShipsToBoard b board = foldr (addCellToBoard 's') board (concat (ships b))
 
 addHitsToBoard :: Board -> [String] -> [String]
-addHitsToBoard b board = foldr (addCellToBoard 'x') board (filter (\cell -> isInList cell (attackedCells b)) (concat (ships b)))
+addHitsToBoard b board = foldr (addCellToBoard 'x') board (filter (\cell -> contains cell (attackedCells b)) (concat (ships b)))
 
 addMissesToBoard :: Board -> [String] -> [String]
 addMissesToBoard b board = foldr (addCellToBoard 'm') board (attackedCells b)

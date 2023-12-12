@@ -96,3 +96,43 @@ executable server
     , text >=2.0.2
     , vty >=5.38
   default-language: Haskell2010
+
+test-suite battleship-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      ClientMessages
+      Common
+      ServerMessages
+      Types
+      ClientInfra
+      GameClient
+      GameLogic
+      UI
+      UIConst
+      UIDraw
+      BattleShipServerLoop
+      GameServer
+      GameServerConfig
+      ServerInfra
+      Paths_battleship
+  autogen-modules:
+      Paths_battleship
+  hs-source-dirs:
+      ./src/
+      ./src/client/
+      ./src/server/
+      test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      QuickCheck
+    , async
+    , base >=4.7 && <5
+    , brick >=1.9
+    , microlens >=0.4.13.1
+    , microlens-th >=0.4.3.14
+    , network >=2.7 && <3.2
+    , network-bsd >=2.7 && <2.9
+    , text >=2.0.2
+    , vty >=5.38
+  default-language: Haskell2010

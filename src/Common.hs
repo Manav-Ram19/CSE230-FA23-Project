@@ -1,5 +1,5 @@
 module Common (
-modifyListAtInd, getElemAtInd, isInList, isSubset
+modifyListAtInd, getElemAtInd, contains, containsAll
 ) where
 
 ---------- LISTS ----------
@@ -8,16 +8,18 @@ modifyListAtInd, getElemAtInd, isInList, isSubset
 -- [[],[4,5,6],[1,2,3]]
 
 modifyListAtInd :: Int -> a -> [a] -> [a]
-modifyListAtInd ind newVal oldList = take ind oldList ++ [newVal] ++ drop (ind + 1) oldList
+modifyListAtInd ind newVal oldList
+    | ind >= 0 && ind < length oldList = take ind oldList ++ [newVal] ++ drop (ind + 1) oldList
+    | otherwise = oldList
 
 getElemAtInd :: Int -> a -> [a] -> a
 getElemAtInd _ defaultVal [] = defaultVal
 getElemAtInd 0 _ l = head l
 getElemAtInd n defaultVal (_ : ls) = getElemAtInd (n - 1) defaultVal ls
 
-isInList :: (Eq a) => a -> [a] -> Bool
-isInList x = foldr (\ y -> (||) (x == y)) False
+contains :: (Eq a) => a -> [a] -> Bool
+contains x = foldr (\ y -> (||) (x == y)) False
 
-isSubset :: (Eq a) => [a] -> [a] -> Bool
-isSubset [] _ = True
-isSubset (x:xs) y = isInList x y && isSubset xs y
+containsAll :: (Eq a) => [a] -> [a] -> Bool
+containsAll [] _ = True
+containsAll (x:xs) y = contains x y && containsAll xs y

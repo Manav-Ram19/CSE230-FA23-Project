@@ -3,7 +3,7 @@ module GameLogic (
 ) where
 import UIConst (Direction (..), GameStateForUI (..))
 import Types (numRows, numCols, numShipsPerPlayer, Cell (Cell), Board (..), LocalGameState (..), GameTurn (..), Ship)
-import Common (isInList, isSubset)
+import Common (contains, containsAll)
 import qualified Data.Maybe
 
 ---------- GAME STATE MANIPULATION LOGIC ----------
@@ -15,7 +15,7 @@ addShip :: GameStateForUI -> GameStateForUI
 addShip sgsui@(SetupGameStateForUI ss s r c dir curShipSize isP1 sent)
   | length ss >= numShipsPerPlayer = sgsui
   | isShipPlacementOutOfBounds (r, c) curShipSize dir = sgsui
-  | foldr (\cell acc -> acc || isInList cell (concat ss)) False newShipPlacement = sgsui
+  | foldr (\cell acc -> acc || contains cell (concat ss)) False newShipPlacement = sgsui
   | otherwise = SetupGameStateForUI newShipList s r c dir nextShipSize isP1 sent
   where
       newShipList = ss ++ [newShipPlacement]
@@ -83,13 +83,13 @@ numShipsToNextShipSize n
   | otherwise = Nothing
 
 isCellChosenBefore :: Cell -> Board -> Bool
-isCellChosenBefore c (Board _ ac) = isInList c ac
+isCellChosenBefore c (Board _ ac) = contains c ac
 
 checkIfPlayerWon :: [Cell] -> [Ship] -> Bool
-checkIfPlayerWon attackedcells opponentships = isSubset (concat opponentships) attackedcells
+checkIfPlayerWon attackedcells opponentships = containsAll (concat opponentships) attackedcells
 
 checkForCollision :: Cell -> [Ship] -> Bool
-checkForCollision cell s = isInList cell (concat s)
+checkForCollision cell s = contains cell (concat s)
 
 findNextGameTurn :: Bool -> Bool -> GameTurn -> GameTurn
 findNextGameTurn isHit isGameOver curTurn
@@ -99,5 +99,5 @@ findNextGameTurn isHit isGameOver curTurn
     | otherwise = Player1
 
 isWinner :: LocalGameState -> Bool
-isWinner (LocalGameState _ opb _ GameOver _) = isSubset (concat $ ships opb) (attackedCells opb)
+isWinner (LocalGameState _ opb _ GameOver _) = containsAll (concat $ ships opb) (attackedCells opb)
 isWinner _ = False

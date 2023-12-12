@@ -19,7 +19,7 @@ import Brick.Widgets.Core
 import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Border.Style as BS
 import qualified Brick.Widgets.Center as C
-import Common (isInList)
+import Common (contains)
 import UIConst (highlight, nothing, ship, miss, hit, battleshipText, cyan, red, youLoseText, green, youWinText)
 import Types (numRows, numCols)
 
@@ -76,7 +76,7 @@ drawGrid grid label highLightedCells =
     gridWithHighLightBool = map convertRow gridWithRowId
     convertRow :: (Int, [(Int, Char)]) -> [(Char, Bool)]
     convertRow (_, []) = []
-    convertRow (rowId, (colId, c) : ls) = (if isInList (rowId, colId) highLightedCells then (c, True) else (c, False)) : convertRow (rowId, ls)
+    convertRow (rowId, (colId, c) : ls) = (if contains (rowId, colId) highLightedCells then (c, True) else (c, False)) : convertRow (rowId, ls)
     gridWithRowId = zip [0 .. (numRows - 1)] gridWithColId
     gridWithColId = map (zip [0 .. (numCols - 1)]) grid
 
