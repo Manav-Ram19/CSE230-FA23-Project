@@ -4,8 +4,13 @@ module GameServer (
     sendGameUpdateToPlayer
 ) where
 
-import ServerInfra ( getFromClient, initServer, sendToClient )
-import GHC.IO.Handle ( Handle, hClose )
+import GHC.IO.Handle
+    ( Handle,
+      hClose,
+      Handle,
+      hSetBuffering,
+      hGetLine,
+      BufferMode(LineBuffering) )
 import GHC.Conc ()
 import Control.Concurrent.Async ( async, wait )
 import Types
@@ -13,12 +18,35 @@ import Types
       Cell,
       GameState(GameState),
       GameTurn(Player1),
-      Player )
+      Player,
+      Port )
 import ServerMessages
-    (ServerMessage(ServerStateUpdate, SendShips, GetShips) )
+    ( ServerMessage(ServerStateUpdate, SendShips, GetShips),
+      encodeServerMessage,
+      ServerMessage )
 import ClientMessages
-    ( ClientMessages(ClientStateUpdate, SetShips) )
+    ( ClientMessages(ClientStateUpdate, SetShips),
+      decodeClientMessage,
+      ClientMessages )
 import GameServerConfig ( serverPort )
+import Network.Socket
+    ( socketToHandle,
+      defaultHints,
+      getAddrInfo,
+      setSocketOption,
+      accept,
+      bind,
+      listen,
+      socket,
+      defaultProtocol,
+      AddrInfo(addrAddress, addrFlags, addrSocketType, addrFamily),
+      AddrInfoFlag(AI_PASSIVE),
+      SocketOption(ReuseAddr),
+      Socket,
+      SocketType(Stream) )
+import GHC.IO.IOMode (IOMode(ReadWriteMode))
+import Control.Concurrent (forkIO)
+import GHC.IO.Handle.Text ( hPutStrLn )
 
 numPlayersPerGame :: Int
 numPlayersPerGame = 2
@@ -27,15 +55,12 @@ type NewPlayer = Handle
 type GameLoopCallBack = GameState -> IO GameState
 
 startGameServer :: GameLoopCallBack -> IO ()
-startGameServer gameloop = do
-    initServer serverPort numPlayersPerGame (validateAndStartGame gameloop)
+startGameServer gameloop = initServer serverPort numPlayersPerGame (validateAndStartGame gameloop)
 
 validateAndStartGame :: GameLoopCallBack -> [NewPlayer] -> IO ()
 validateAndStartGame gameloop players
     | length players == numPlayersPerGame = execGame gameloop (head players) (head (tail players)) -- Implicit dry violation?
-    | otherwise = do
-        putStrLn ("error: Ending Server gracefully. Reason: Game started with " ++ show (length players) ++ " players. Expecting:" ++ show numPlayersPerGame)
-
+    | otherwise = putStrLn ("error: Ending Server gracefully. Reason: Game started with " ++ show (length players) ++ " players. Expecting:" ++ show numPlayersPerGame)
 
 execGame :: GameLoopCallBack -> NewPlayer -> NewPlayer -> IO ()
 execGame gameloop p1 p2 = do
@@ -75,5 +100,50 @@ getGameUpdateFromPlayer playerHandle = do
         _ -> error ("Invalid message from client. Expecting cell. Got: " ++ show clientMsg)
 
 sendGameUpdateToPlayer :: Player -> Cell -> GameTurn -> IO ()
-sendGameUpdateToPlayer playerHandle c t = do
-    sendToClient (ServerStateUpdate c t) playerHandle
+sendGameUpdateToPlayer playerHandle c t = sendToClient (ServerStateUpdate c t) playerHandle
+
+
+--------- SERVER SOCKETS --------
+
+type ConnectionCallBack = [Handle] -> IO ()
+type NumBufferedConnectionsBeforeCallBack = Int
+
+maxQueuedCons :: Int
+maxQueuedCons = 1024 -- TODO: Verify if this constant matters
+
+initServer :: Port -> NumBufferedConnectionsBeforeCallBack -> ConnectionCallBack -> IO ()
+initServer portNumberAsStr numBufferedConnectionsBeforeCallBack callBack = do
+    sock <- createSocket portNumberAsStr
+    serverLoop sock numBufferedConnectionsBeforeCallBack callBack []
+
+createSocket :: Port -> IO Socket
+createSocket portNumberAsStr = do
+    addrInfos <- getAddrInfo (Just defaultHints {addrFlags = [AI_PASSIVE], addrSocketType = Stream}) Nothing (Just portNumberAsStr)
+    sock <- socket (addrFamily (head addrInfos)) Stream defaultProtocol
+    setSocketOption sock ReuseAddr 1
+    bind sock (addrAddress (head addrInfos))
+    listen sock maxQueuedCons
+    pure sock
+
+serverLoop :: Socket -> NumBufferedConnectionsBeforeCallBack -> ConnectionCallBack -> [Handle] -> IO ()
+serverLoop serverSock numBufferedConnectionsBeforeCallBack callBack queuedConnections  = do
+    (clientSock, _) <- accept serverSock
+    clientHandle <- socketToHandle clientSock ReadWriteMode
+    hSetBuffering clientHandle LineBuffering
+    remainingQueuedConections <- handleCallBack numBufferedConnectionsBeforeCallBack callBack (queuedConnections ++ [clientHandle])
+    serverLoop serverSock numBufferedConnectionsBeforeCallBack callBack remainingQueuedConections
+
+handleCallBack :: NumBufferedConnectionsBeforeCallBack -> ConnectionCallBack -> [Handle] -> IO [Handle]
+handleCallBack numBufferedConnectionsBeforeCallBack callBack queuedConnections
+    | length queuedConnections >= numBufferedConnectionsBeforeCallBack = do
+        _ <- forkIO (callBack (take numBufferedConnectionsBeforeCallBack queuedConnections))
+        handleCallBack numBufferedConnectionsBeforeCallBack callBack (drop numBufferedConnectionsBeforeCallBack queuedConnections)
+    | otherwise = pure queuedConnections
+
+sendToClient :: ServerMessage -> Handle -> IO ()
+sendToClient s h = hPutStrLn h (encodeServerMessage s)
+
+getFromClient :: Handle -> IO (Maybe ClientMessages)
+getFromClient h = do
+    s <- hGetLine h
+    pure (decodeClientMessage s)

@@ -1,9 +1,9 @@
-module Main where 
+module Main (
+    main
+) where 
 
 import Prelude  
-
-import BattleShipServerLoop (startBattleShipServer)
+import ServerLogic (startBattleShipServer)
 
 main :: IO ()
 main = startBattleShipServer
--- main =

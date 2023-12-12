@@ -1,5 +1,5 @@
-module UI
-  ( startUI,
+module Presenter 
+  ( present,
   )
 where
 
@@ -17,7 +17,7 @@ import Control.Concurrent (forkIO)
 import Control.Monad (forever, unless, when)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import GHC.Conc (threadDelay)
-import GameClient (getGameStateUpdate, getOpponentShips, sendGameStateUpdate, sendPlayerShips)
+import ClientNetwork (getGameStateUpdate, getOpponentShips, sendGameStateUpdate, sendPlayerShips)
 import qualified Graphics.Vty as V
 import Types
     ( numCols,
@@ -220,8 +220,8 @@ app =
       appAttrMap = const myattrApp
     }
 
-startUI :: Server -> Bool -> IO ()
-startUI s isP1 = do
+present :: Server -> Bool -> IO ()
+present s isP1 = do
   let builder = V.mkVty V.defaultConfig
   initialVty <- builder
   chan <- newBChan 10

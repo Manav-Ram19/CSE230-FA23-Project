@@ -1,4 +1,4 @@
-module BattleShipServerLoop (startBattleShipServer) where
+module ServerLogic (startBattleShipServer) where
     
 import Types
     ( GameState(GameState), GameTurn(GameOver, Player1, Player2) )

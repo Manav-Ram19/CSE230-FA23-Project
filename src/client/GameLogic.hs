@@ -8,9 +8,6 @@ import qualified Data.Maybe
 
 ---------- GAME STATE MANIPULATION LOGIC ----------
 
--- >>> map (uncurry Cell) (getPositionsFromStartDirAndLen (0,1) 3 UIConst.Right)
--- [Cell {row = 0, col = 1},Cell {row = 0, col = 2},Cell {row = 0, col = 3}]
-
 addShip :: GameStateForUI -> GameStateForUI
 addShip sgsui@(SetupGameStateForUI ss s r c dir curShipSize isP1 sent)
   | length ss >= numShipsPerPlayer = sgsui

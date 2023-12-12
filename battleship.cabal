@@ -28,16 +28,14 @@ executable client
       Common
       ServerMessages
       Types
-      ClientInfra
-      GameClient
+      ClientNetwork
       GameLogic
-      UI
+      Presenter
       UIConst
       UIDraw
-      BattleShipServerLoop
       GameServer
       GameServerConfig
-      ServerInfra
+      ServerLogic
       Paths_battleship
   autogen-modules:
       Paths_battleship
@@ -66,16 +64,14 @@ executable server
       Common
       ServerMessages
       Types
-      ClientInfra
-      GameClient
+      ClientNetwork
       GameLogic
-      UI
+      Presenter
       UIConst
       UIDraw
-      BattleShipServerLoop
       GameServer
       GameServerConfig
-      ServerInfra
+      ServerLogic
       Paths_battleship
   autogen-modules:
       Paths_battleship
@@ -105,16 +101,14 @@ test-suite battleship-test
       Common
       ServerMessages
       Types
-      ClientInfra
-      GameClient
+      ClientNetwork
       GameLogic
-      UI
+      Presenter
       UIConst
       UIDraw
-      BattleShipServerLoop
       GameServer
       GameServerConfig
-      ServerInfra
+      ServerLogic
       Paths_battleship
   autogen-modules:
       Paths_battleship
