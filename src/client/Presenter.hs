@@ -1,4 +1,4 @@
-module Presenter 
+module Presenter
   ( present,
   )
 where
@@ -7,7 +7,7 @@ import GameLogic
     ( addShip,
       getPositionsFromStartDirAndLen,
       execPlayerTurn,
-      execOpponentTurn )
+      execOpponentTurn, isShipPlacementOutOfBounds, isShipCollidingWithExistingShip )
 import Common (modifyListAtInd, getElemAtInd, contains)
 import UIConst (RemoteStatusUpdate (..), GameStateForUI (..), Name, Direction (..), myattrApp)
 import UIDraw
@@ -66,11 +66,16 @@ addCellToBoard ch (Cell r c) curBoard = modifyListAtInd r (modifyListAtInd c ch 
 
 draw :: GameStateForUI -> [Widget a]
 -- setup game state
-draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _ _) = drawSetupPhase mb hcells numShipsRemaining
+draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _ _) = drawSetupPhase mb hcells numShipsRemaining isValidHighlight
   where
     numShipsRemaining = numShipsPerPlayer - length myShips
     hcells = getPositionsFromStartDirAndLen (curR, curC) shipSize curDir
     mb = makePlayerBoard (Board myShips [])
+    isValidHighlight = not (isShipOutOfBounds || isShipCollidingWithOldShip)
+    isShipOutOfBounds = isShipPlacementOutOfBounds (curR, curC) shipSize curDir
+    isShipCollidingWithOldShip = isShipCollidingWithExistingShip shipLocation myShips
+    shipLocation = map (uncurry Cell) hcells
+
 -- end game state
 draw (EndGameStateForUI isw) = drawEndGamePhase isw
 --  during game

@@ -1,5 +1,5 @@
 module UIConst (
- Name, GameStateForUI(..), RemoteStatusUpdate(..),  Direction(..),  highlight, hit, ship, nothing, cyan, red, green, miss, myattrApp, battleshipText, youLoseText, youWinText
+ Name, GameStateForUI(..), RemoteStatusUpdate(..),  Direction(..),  invalidhighlight, highlight, hit, ship, nothing, cyan, red, green, miss, myattrApp, battleshipText, youLoseText, youWinText
 )where
 import Types (Ship, Server, LocalGameState)
 import Brick (AttrName, AttrMap, attrMap)
@@ -40,6 +40,9 @@ data RemoteStatusUpdate = RemoteStatusUpdate
 highlight :: AttrName
 highlight = attrName "highlight"
 
+invalidhighlight :: AttrName
+invalidhighlight = attrName "invalidhighlight"
+
 hit :: AttrName
 hit = attrName "hit"
 
@@ -66,6 +69,7 @@ myattrApp =
   attrMap
     (brightWhite `on` black)
     [ (highlight, fg brightYellow),
+      (invalidhighlight, fg brightRed),
       (hit, fg brightRed),
       (ship, fg brightGreen),
       (nothing, fg brightBlack),

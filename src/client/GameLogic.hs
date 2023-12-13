@@ -1,5 +1,5 @@
 module GameLogic (
-  addShip, execPlayerTurn, getPositionsFromStartDirAndLen, execOpponentTurn
+  addShip, execPlayerTurn, getPositionsFromStartDirAndLen, execOpponentTurn, isShipPlacementOutOfBounds, isShipCollidingWithExistingShip
 ) where
 import UIConst (Direction (..), GameStateForUI (..))
 import Types (numRows, numCols, numShipsPerPlayer, Cell (Cell), Board (..), LocalGameState (..), GameTurn (..), Ship)
@@ -22,7 +22,7 @@ addShip gs = gs
 
 execPlayerTurn :: GameStateForUI -> GameStateForUI
 execPlayerTurn gsui@(GameStateForUI lgs r c) =
-  if isCellChosenBefore (Cell r c) (oppBoard lgs) then gsui
+  if isCellAttackedBefore (Cell r c) (oppBoard lgs) then gsui
   else case findNextGameTurn isHit isGameOver (turn lgs) of
         GameOver -> EndGameStateForUI (isWinner newgs)
         _ -> GameStateForUI newgs r c
@@ -50,6 +50,13 @@ execOpponentTurn attackedCell@(Cell r c) turnUpdateFromOpponent gsui@(GameStateF
 execOpponentTurn _ _ gs = gs
 
 ---------- HELPERS ----------
+
+isShipCollidingWithExistingShip :: Ship -> [Ship] -> Bool
+isShipCollidingWithExistingShip _ [] = False
+isShipCollidingWithExistingShip [] _ = False
+isShipCollidingWithExistingShip s ss = foldr (\c acc -> acc || contains c sscs) False s
+  where
+    sscs = concat ss
 
 isShipPlacementOutOfBounds:: (Int, Int) -> Int -> Direction -> Bool
 isShipPlacementOutOfBounds (startR, _) shipLen UIConst.Up = startR - shipLen + 1 < 0
@@ -79,8 +86,8 @@ numShipsToNextShipSize n
   | n == 4 = Just 5
   | otherwise = Nothing
 
-isCellChosenBefore :: Cell -> Board -> Bool
-isCellChosenBefore c (Board _ ac) = contains c ac
+isCellAttackedBefore :: Cell -> Board -> Bool
+isCellAttackedBefore c (Board _ ac) = contains c ac
 
 checkIfPlayerWon :: [Cell] -> [Ship] -> Bool
 checkIfPlayerWon attackedcells opponentships = containsAll (concat opponentships) attackedcells
