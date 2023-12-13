@@ -12,7 +12,7 @@ data ServerMessage =
     SendShips [Ship] |
     ServerStateUpdate Cell GameTurn |
     EndGame
-    deriving (Show, Read)
+    deriving (Show, Read, Eq)
 
 -- >>> show (GetShips False)
 -- "GetShips False"

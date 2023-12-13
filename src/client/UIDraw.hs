@@ -20,15 +20,15 @@ import qualified Brick.Widgets.Border as B
 import qualified Brick.Widgets.Border.Style as BS
 import qualified Brick.Widgets.Center as C
 import Common (contains)
-import UIConst (highlight, nothing, ship, miss, hit, battleshipText, cyan, red, youLoseText, green, youWinText)
+import UIConst (highlight, nothing, ship, miss, hit, battleshipText, cyan, red, youLoseText, green, youWinText, invalidhighlight)
 import Types (numRows, numCols)
 
 ---------- DRAWING PHASES ----------
 
-drawSetupPhase :: [String] -> [(Int, Int)] -> Int -> [Widget a]
-drawSetupPhase b highLightedCells numShipsRemaining = [C.vCenter (C.hCenter drawTitle <=> C.hCenter grid <=> C.hCenter (drawShipsRemaining numShipsRemaining) <=> C.hCenter drawTutorial)]
+drawSetupPhase :: [String] -> [(Int, Int)] -> Int -> Bool -> [Widget a]
+drawSetupPhase b highLightedCells numShipsRemaining isValidHighlight = [C.vCenter (C.hCenter drawTitle <=> C.hCenter grid <=> C.hCenter (drawShipsRemaining numShipsRemaining) <=> C.hCenter drawTutorial)]
   where
-    grid = hBox [drawGrid b "My Board" highLightedCells]
+    grid = hBox [drawGrid b "My Board" highLightedCells isValidHighlight]
 
 drawEndGamePhase :: Bool -> [Widget a]
 drawEndGamePhase isw = [C.vCenter $ C.hCenter (drawEndGame isw)]
@@ -47,15 +47,15 @@ drawGamePhase :: [String] -> [String] -> [(Int, Int)] -> Bool -> [Widget a]
 drawGamePhase mb ob highlightedCells isPTurn = [C.vCenter $ drawTitle <=> C.hCenter grid <=> C.hCenter (padTop (Pad 4) turnBox)]
   where
     turnBox = drawGameTurn isPTurn
-    grid = hBox [drawGrid mb "My Board" [], drawGrid ob "Opponents Board" highlightedCells]
+    grid = hBox [drawGrid mb "My Board" [] True, drawGrid ob "Opponents Board" highlightedCells True]
 
 ---------- DRAWINGS GRIDS ----------
-drawCell :: (Char, Bool) -> Widget n
-drawCell (c, highlighted) =
+drawCell :: Bool ->  (Char, Bool) -> Widget n
+drawCell isValidHighlight (c, highlighted) =
   overrideAttr B.borderAttr attr (B.border (str (" " ++ [renderChar c] ++ " ")))
   where
     -- if highlighted then withAttr (attrName "warning") (str (" " ++ "D" ++ " ")) else str (" " ++ [c] ++ " ")
-    attr = if highlighted then highlight else getCorrectAttr c
+    attr = if highlighted then if isValidHighlight then highlight else invalidhighlight else getCorrectAttr c
     getCorrectAttr '.' = nothing
     getCorrectAttr 's' = ship
     getCorrectAttr 'x' = hit
@@ -67,11 +67,11 @@ drawCell (c, highlighted) =
     renderChar 'm' = 'M'
     renderChar _ = ' '
 
-drawGrid :: [String] -> String -> [(Int, Int)] -> Widget n
-drawGrid grid label highLightedCells =
+drawGrid :: [String] -> String -> [(Int, Int)] -> Bool -> Widget n
+drawGrid grid label highLightedCells isValidHighlight =
   B.borderWithLabel (str label) $
     vBox $
-      map (hBox . map drawCell) gridWithHighLightBool
+      map (hBox . map (drawCell isValidHighlight)) gridWithHighLightBool
   where
     gridWithHighLightBool = map convertRow gridWithRowId
     convertRow :: (Int, [(Int, Char)]) -> [(Char, Bool)]

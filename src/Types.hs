@@ -7,14 +7,13 @@ module Types (
     Board (..),
     Player,
     GameTurn (..),
-    GameState (..),
+    ServerGameState (..),
     Port,
-    LocalGameState (..),
     Server,
-    ClientGameLoopCallBack
+    Direction (..),
+    ClientGameState (..)
 ) where
 import GHC.IO.Handle (Handle)
-
 
 numRows :: Int
 numRows = 10
@@ -27,6 +26,8 @@ data Cell = Cell {
     col :: Int
  } deriving(Eq, Show, Read)
 
+data Direction = Left | Right | Up | Down deriving (Eq)
+
 type Ship = [Cell]
 
 data Board = Board {
@@ -38,22 +39,31 @@ type Player = Handle
 
 data GameTurn = Player1 | Player2 | GameOver deriving(Eq, Show, Read)
 
-data GameState = GameState {
+data ServerGameState = GameState {
     player1 :: Player,
     player2 :: Player,
     gameTurn :: GameTurn
 }
 
+data ClientGameState = SetupGameState {
+    _setupships :: [Ship],
+    _setupcurrRow :: Int,
+    _setupcurrCol :: Int,
+    _setupcurrDirection :: Direction,
+    _nextShipSize :: Int,
+    _isP1 :: Bool
+  } | GamePlayState {
+    _myBoard :: Board,
+    _oppBoard :: Board,
+    _amIP1 :: Bool,
+    _turn :: GameTurn,
+    _currAttackRow :: Int,
+    _currAttackCol :: Int
+  } | EndGameState {
+    _isWinner :: Bool
+  } deriving (Eq)
+
 type Port = String
 
-data LocalGameState = LocalGameState {
-    myBoard :: Board,
-    oppBoard :: Board,
-    amIP1 :: Bool,
-    turn :: GameTurn, 
-    server :: Server
-} deriving (Show, Eq)
-
 type Server = Handle
-type ClientGameLoopCallBack = (LocalGameState -> Server -> IO LocalGameState)
 

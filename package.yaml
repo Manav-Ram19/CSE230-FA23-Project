@@ -26,8 +26,10 @@ dependencies:
 - brick >= 1.9
 - vty >= 5.38
 - text >= 2.0.2
+- random >=1.2
 - microlens >= 0.4.13.1
 - microlens-th >= 0.4.3.14
+- mtl >=2.2
 
 ghc-options:
 - -Wall

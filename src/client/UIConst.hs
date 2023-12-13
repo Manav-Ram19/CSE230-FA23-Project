@@ -1,7 +1,7 @@
 module UIConst (
- Name, GameStateForUI(..), RemoteStatusUpdate(..),  Direction(..),  highlight, hit, ship, nothing, cyan, red, green, miss, myattrApp, battleshipText, youLoseText, youWinText
+ Name, GameStateForPresenter(..), RemoteStatusUpdate(..),  invalidhighlight, highlight, hit, ship, nothing, cyan, red, green, miss, myattrApp, battleshipText, youLoseText, youWinText
 )where
-import Types (Ship, Server, LocalGameState)
+import Types (Server, ClientGameState)
 import Brick (AttrName, AttrMap, attrMap)
 import Brick.AttrMap (attrName)
 import Graphics.Vty (brightWhite, black)
@@ -11,27 +11,10 @@ import Graphics.Vty.Attributes (brightYellow, brightRed, brightGreen, brightBlac
 ---------- TYPES ----------
 type Name = ()
 
-data GameStateForUI =
-  SetupGameStateForUI {
-    _setupships :: [Ship],
-    _setupserver :: Server,
-    _setupcurrRow :: Int,
-    _setupcurrCol :: Int,
-    _setupcurrDirection :: Direction,
-    _nextShipSize :: Int,
-    _isP1 :: Bool,
-    _sentShipsToServer :: Bool
-  }
-  | GameStateForUI
-      { _localGameState :: LocalGameState,
-        _currRow :: Int,
-        _currCol :: Int
-      }
-  | EndGameStateForUI
-      { _didClientWin :: Bool
-      } deriving (Eq)
-
-data Direction = Left | Right | Up | Down deriving (Eq)
+data GameStateForPresenter = GameStateForPresenter {
+  _clientGameState :: ClientGameState,
+  _server :: Server
+}  deriving (Eq)
 
 data RemoteStatusUpdate = RemoteStatusUpdate
 
@@ -39,6 +22,9 @@ data RemoteStatusUpdate = RemoteStatusUpdate
 
 highlight :: AttrName
 highlight = attrName "highlight"
+
+invalidhighlight :: AttrName
+invalidhighlight = attrName "invalidhighlight"
 
 hit :: AttrName
 hit = attrName "hit"
@@ -66,6 +52,7 @@ myattrApp =
   attrMap
     (brightWhite `on` black)
     [ (highlight, fg brightYellow),
+      (invalidhighlight, fg brightRed),
       (hit, fg brightRed),
       (ship, fg brightGreen),
       (nothing, fg brightBlack),
