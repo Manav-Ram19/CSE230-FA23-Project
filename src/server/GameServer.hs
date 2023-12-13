@@ -16,7 +16,7 @@ import Control.Concurrent.Async ( async, wait )
 import Types
     ( Board(Board, ships),
       Cell,
-      GameState(GameState),
+      ServerGameState(GameState),
       GameTurn(Player1),
       Player,
       Port )
@@ -52,7 +52,7 @@ numPlayersPerGame :: Int
 numPlayersPerGame = 2
 
 type NewPlayer = Handle
-type GameLoopCallBack = GameState -> IO GameState
+type GameLoopCallBack = ServerGameState -> IO ServerGameState
 
 startGameServer :: GameLoopCallBack -> IO ()
 startGameServer gameloop = initServer serverPort numPlayersPerGame (validateAndStartGame gameloop)
@@ -89,7 +89,7 @@ getBoard isplayerOne player = do
         Just (SetShips s) -> pure (Board s [])
         _ -> error ("Invalid api call to Server. Expecting SetShips call. Got: " ++ show response)
 
-makeInitialGameState :: Player -> Player -> GameState
+makeInitialGameState :: Player -> Player -> ServerGameState
 makeInitialGameState p1 p2 = GameState p1 p2 Player1
 
 getGameUpdateFromPlayer :: Player -> IO (Cell, GameTurn)

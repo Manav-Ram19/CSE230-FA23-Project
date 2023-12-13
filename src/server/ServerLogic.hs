@@ -1,7 +1,7 @@
 module ServerLogic (startBattleShipServer) where
     
 import Types
-    ( GameState(GameState), GameTurn(GameOver, Player1, Player2) )
+    ( ServerGameState(GameState), GameTurn(GameOver, Player1, Player2) )
 import GameServer
     ( startGameServer,
       getGameUpdateFromPlayer,
@@ -11,7 +11,7 @@ startBattleShipServer :: IO ()
 startBattleShipServer = do
     startGameServer gameLoop
 
-gameLoop :: GameState -> IO GameState
+gameLoop :: ServerGameState -> IO ServerGameState
 gameLoop gs@(GameState p1 p2 curTurn) =
     case curTurn of
         Player1 -> do

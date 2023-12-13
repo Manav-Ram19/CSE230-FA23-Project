@@ -7,9 +7,9 @@ import GameLogic
     ( addShip,
       getPositionsFromStartDirAndLen,
       execPlayerTurn,
-      execOpponentTurn, isShipPlacementOutOfBounds, isShipCollidingWithExistingShip )
+      execOpponentTurn, isShipPlacementOutOfBounds, isShipCollidingWithExistingShip, turnDirectionClockWise, turnDirectionAntiClockWise, moveSelectedCell )
 import Common (modifyListAtInd, getElemAtInd, contains)
-import UIConst (RemoteStatusUpdate (..), GameStateForUI (..), Name, Direction (..), myattrApp)
+import UIConst (RemoteStatusUpdate (..), Name, myattrApp, GameStateForPresenter (..))
 import UIDraw
     ( drawEndGamePhase, drawSetupPhase, drawGamePhase )
 import Brick.BChan (newBChan, writeBChan)
@@ -20,15 +20,11 @@ import GHC.Conc (threadDelay)
 import ClientNetwork (getGameStateUpdate, getOpponentShips, sendGameStateUpdate, sendPlayerShips)
 import qualified Graphics.Vty as V
 import Types
-    ( numCols,
-      numRows,
-      numShipsPerPlayer,
+    ( numShipsPerPlayer,
       Board(..),
       Cell(Cell),
       GameTurn(..),
-      LocalGameState(LocalGameState, server, myBoard, oppBoard, amIP1,
-                     turn),
-      Server )
+      Server, ClientGameState (..), Direction (..) )
 import Brick
     ( BrickEvent(..),
       EventM,
@@ -64,9 +60,9 @@ addCellToBoard ch (Cell r c) curBoard = modifyListAtInd r (modifyListAtInd c ch 
 
 ---------- BRICK DRAW ----------
 
-draw :: GameStateForUI -> [Widget a]
+draw :: GameStateForPresenter -> [Widget a]
 -- setup game state
-draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _ _) = drawSetupPhase mb hcells numShipsRemaining isValidHighlight
+draw (GameStateForPresenter (SetupGameState myShips curR curC curDir shipSize _) _) = drawSetupPhase mb hcells numShipsRemaining isValidHighlight
   where
     numShipsRemaining = numShipsPerPlayer - length myShips
     hcells = getPositionsFromStartDirAndLen (curR, curC) shipSize curDir
@@ -77,98 +73,95 @@ draw (SetupGameStateForUI myShips _ curR curC curDir shipSize _ _) = drawSetupPh
     shipLocation = map (uncurry Cell) hcells
 
 -- end game state
-draw (EndGameStateForUI isw) = drawEndGamePhase isw
+draw (GameStateForPresenter (EndGameState isw) _) = drawEndGamePhase isw
 --  during game
-draw (GameStateForUI lgs curRow curCol) = drawGamePhase mb ob highlightedCells isPTurn
+draw (GameStateForPresenter (GamePlayState mb ob isP1 t r c) _) = drawGamePhase myBoard opBoard highlightedCells isPTurn
   where
-    mb = makePlayerBoard (myBoard lgs)
-    ob = makeOpponentBoard (oppBoard lgs)
-    isPTurn = isMyTurn (amIP1 lgs) (turn lgs)
-    highlightedCells = [(curRow, curCol) | isPTurn]
+    myBoard = makePlayerBoard mb
+    opBoard = makeOpponentBoard ob
+    isPTurn = isMyTurn isP1 t
+    highlightedCells = [(r, c) | isPTurn]
 
 -------------------- EVENTS -------------------
 
-handleEvent :: BrickEvent Name RemoteStatusUpdate -> EventM n GameStateForUI ()
+handleEvent :: BrickEvent Name RemoteStatusUpdate -> EventM n GameStateForPresenter ()
 handleEvent (VtyEvent (V.EvKey (V.KChar 'q') [])) = halt
 handleEvent e = do
   currState <- get
-  case currState of
-    SetupGameStateForUI {} -> handleEventSetupGame e
-    GameStateForUI {} -> handleEventPlayGame e
-    EndGameStateForUI _ -> pure ()
+  case _clientGameState currState of
+    SetupGameState {} -> handleEventSetupGame e
+    GamePlayState {} -> handleEventPlayGame e
+    EndGameState _ -> pure ()
 
-handleEventSetupGame :: BrickEvent Name RemoteStatusUpdate -> EventM n GameStateForUI ()
+handleEventSetupGame :: BrickEvent Name RemoteStatusUpdate -> EventM n GameStateForPresenter ()
 handleEventSetupGame e = do
   sgsui <- get
   eventHandler e sgsui
   where
-    eventHandler :: BrickEvent Name RemoteStatusUpdate -> GameStateForUI -> EventM n GameStateForUI ()
-    eventHandler(AppEvent RemoteStatusUpdate) sgsui@(SetupGameStateForUI {}) = do
-      if length (_setupships sgsui) < numShipsPerPlayer then pure ()
+    eventHandler :: BrickEvent Name RemoteStatusUpdate -> GameStateForPresenter -> EventM n GameStateForPresenter ()
+    eventHandler(AppEvent RemoteStatusUpdate) (GameStateForPresenter gs@(SetupGameState {}) server) = do
+      if length (_setupships gs) < numShipsPerPlayer then pure ()
       else do
-        maybeoppShips <- liftIO $ getOpponentShips (_setupserver sgsui)
+        maybeoppShips <- liftIO $ getOpponentShips server
         case maybeoppShips of
           Just oppShips -> do
-            let lgs = LocalGameState (Board (_setupships sgsui) []) (Board oppShips []) (_isP1 sgsui) Player1 (_setupserver sgsui)
-            let gsui = GameStateForUI lgs 0 0
+            let newgs = GamePlayState (Board (_setupships gs) []) (Board oppShips []) (_isP1 gs) Player1 0 0
+            let gsui = GameStateForPresenter newgs server
             put gsui
           _ -> pure ()
-    eventHandler (VtyEvent (V.EvKey V.KUp [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UIConst.Up sgsui
-    eventHandler (VtyEvent (V.EvKey V.KDown [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UIConst.Down sgsui
-    eventHandler (VtyEvent (V.EvKey V.KLeft [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UIConst.Left sgsui
-    eventHandler (VtyEvent (V.EvKey V.KRight [])) sgsui@(SetupGameStateForUI {}) = do put $ moveHighlight UIConst.Right sgsui
+    eventHandler (VtyEvent (V.EvKey V.KUp [])) (GameStateForPresenter gs@(SetupGameState {}) server) = 
+      do put $ GameStateForPresenter (moveSelectedCell Types.Up gs) server
+    eventHandler (VtyEvent (V.EvKey V.KDown [])) (GameStateForPresenter gs@(SetupGameState {}) server) = 
+      do put $ GameStateForPresenter (moveSelectedCell Types.Down gs) server
+    eventHandler (VtyEvent (V.EvKey V.KLeft [])) (GameStateForPresenter gs@(SetupGameState {}) server) = 
+      do put $ GameStateForPresenter (moveSelectedCell Types.Left gs) server
+    eventHandler (VtyEvent (V.EvKey V.KRight [])) (GameStateForPresenter gs@(SetupGameState {}) server) = 
+      do put $ GameStateForPresenter (moveSelectedCell Types.Right gs) server
     -- Clockwise Rotation
-    eventHandler (VtyEvent (V.EvKey (V.KChar 'z') [])) (SetupGameStateForUI ss s r c dir nss isP1 sent) = do
-      let newDir = case dir of
-                    UIConst.Left -> UIConst.Up
-                    UIConst.Up -> UIConst.Right
-                    UIConst.Right -> UIConst.Down
-                    UIConst.Down -> UIConst.Left
-      let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1 sent
-      put newSGSUI
+    eventHandler (VtyEvent (V.EvKey (V.KChar 'z') [])) (GameStateForPresenter (SetupGameState ss r c d nss isp1) server) = do
+      let newdir = turnDirectionClockWise d
+      put $ GameStateForPresenter (SetupGameState ss r c newdir nss isp1) server
     -- Anti-Clockwise Rotation
-    eventHandler (VtyEvent (V.EvKey (V.KChar 'x') [])) (SetupGameStateForUI ss s r c dir nss isP1 sent) = do
-      let newDir = case dir of
-                    UIConst.Left -> UIConst.Down
-                    UIConst.Up -> UIConst.Left
-                    UIConst.Right -> UIConst.Up
-                    UIConst.Down -> UIConst.Right
-      let newSGSUI = SetupGameStateForUI ss s r c newDir nss isP1 sent
-      put newSGSUI
-    eventHandler (VtyEvent (V.EvKey V.KEnter [])) sgsui@(SetupGameStateForUI _ s r c dir _ isP1 sent) = do
-      if sent then pure ()
+    eventHandler (VtyEvent (V.EvKey (V.KChar 'x') [])) (GameStateForPresenter (SetupGameState ss r c d nss isp1) server) = do
+      let newdir = turnDirectionAntiClockWise d
+      put $ GameStateForPresenter (SetupGameState ss r c newdir nss isp1) server
+    -- User wants to add a ship
+    eventHandler (VtyEvent (V.EvKey V.KEnter [])) (GameStateForPresenter gs@(SetupGameState {}) server) = do
+      if _nextShipSize gs == 0 then pure ()
       else do
-        let newsgsui = addShip sgsui
-        if length (_setupships newsgsui) < numShipsPerPlayer then put newsgsui
-        else do
-          liftIO $ sendPlayerShips s (_setupships newsgsui)
-          put $ SetupGameStateForUI (_setupships newsgsui) s r c dir (_nextShipSize newsgsui) isP1 True
+        let newgs = addShip gs
+        when (length (_setupships newgs) == numShipsPerPlayer) $ liftIO $ sendPlayerShips server (_setupships newgs)
+        put (GameStateForPresenter newgs server)
     eventHandler _ _ = pure ()
 
-handleEventPlayGame :: BrickEvent Name RemoteStatusUpdate -> EventM n GameStateForUI ()
+handleEventPlayGame :: BrickEvent Name RemoteStatusUpdate -> EventM n GameStateForPresenter ()
 handleEventPlayGame (AppEvent RemoteStatusUpdate) = do
   currState <- get
   case currState of
-    GameStateForUI lgs _ _ -> do
-      unless (isMyTurn (amIP1 lgs) (turn lgs)) $ do
+    GameStateForPresenter gs@(GamePlayState {}) _ -> do
+      unless (isMyTurn (_amIP1 gs) (_turn gs)) $ do
         uState <- liftIO (handleRemoteStatusUpdate currState)
         put uState
     _ -> pure ()
 handleEventPlayGame e = do
   currState <- get
   case currState of
-    GameStateForUI lgs _ _ -> do
-      when (isMyTurn (amIP1 lgs) (turn lgs)) $ do
+    GameStateForPresenter gs@(GamePlayState {}) _ -> do
+      when (isMyTurn (_amIP1 gs) (_turn gs)) $ do
         uState <- liftIO (eventHandler e currState)
         put uState
     _ -> pure ()
   where
-    eventHandler :: BrickEvent n e -> GameStateForUI -> IO GameStateForUI
-    eventHandler (VtyEvent (V.EvKey V.KUp [])) gsui = pure (moveHighlight UIConst.Up gsui)
-    eventHandler (VtyEvent (V.EvKey V.KDown [])) gsui = pure (moveHighlight UIConst.Down gsui)
-    eventHandler (VtyEvent (V.EvKey V.KLeft [])) gsui = pure (moveHighlight UIConst.Left gsui)
-    eventHandler (VtyEvent (V.EvKey V.KRight [])) gsui = pure (moveHighlight UIConst.Right gsui)
-    eventHandler (VtyEvent (V.EvKey V.KEnter [])) gsui = handleEnter gsui
+    eventHandler :: BrickEvent n e -> GameStateForPresenter -> IO GameStateForPresenter
+    eventHandler (VtyEvent (V.EvKey V.KUp [])) (GameStateForPresenter gs@(GamePlayState {}) server) = 
+      pure $ GameStateForPresenter (moveSelectedCell Types.Up gs) server
+    eventHandler (VtyEvent (V.EvKey V.KDown [])) (GameStateForPresenter gs@(GamePlayState {}) server) = 
+      pure $ GameStateForPresenter (moveSelectedCell Types.Down gs) server
+    eventHandler (VtyEvent (V.EvKey V.KLeft [])) (GameStateForPresenter gs@(GamePlayState {}) server) = 
+      pure $ GameStateForPresenter (moveSelectedCell Types.Left gs) server
+    eventHandler (VtyEvent (V.EvKey V.KRight [])) (GameStateForPresenter gs@(GamePlayState {}) server) = 
+      pure $ GameStateForPresenter (moveSelectedCell Types.Right gs) server
+    eventHandler (VtyEvent (V.EvKey V.KEnter [])) gsp@(GameStateForPresenter (GamePlayState {}) _) = handleEnter gsp
     eventHandler _ gsui = pure gsui
 
 isMyTurn :: Bool -> GameTurn -> Bool
@@ -176,46 +169,34 @@ isMyTurn True Player1 = True
 isMyTurn False Player2 = True
 isMyTurn _ _ = False
 
--- uses direction to upate game state to move current highlighted cell
-moveHighlight :: Direction -> GameStateForUI -> GameStateForUI
-moveHighlight UIConst.Up (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((curRow + numRows - 1) `mod` numRows) curCol
-moveHighlight UIConst.Down (GameStateForUI lgs curRow curCol) = GameStateForUI lgs ((curRow + 1) `mod` numRows) curCol
-moveHighlight UIConst.Left (GameStateForUI lgs curRow curCol) = GameStateForUI lgs curRow ((curCol + numCols - 1) `mod` numCols)
-moveHighlight UIConst.Right (GameStateForUI lgs curRow curCol) = GameStateForUI lgs curRow ((curCol + 1) `mod` numCols)
-
-moveHighlight UIConst.Up (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s ((curRow + numRows - 1) `mod` numRows) curCol curDir nss isP1 sent
-moveHighlight UIConst.Down (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s ((curRow + 1) `mod` numRows) curCol curDir nss isP1 sent
-moveHighlight UIConst.Left (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s curRow ((curCol + numCols - 1) `mod` numCols) curDir nss isP1 sent
-moveHighlight UIConst.Right (SetupGameStateForUI ss s curRow curCol curDir nss isP1 sent) = SetupGameStateForUI ss s curRow ((curCol + 1) `mod` numCols) curDir nss isP1 sent
-
-
-moveHighlight _ gs = gs
-
-handleEnter :: GameStateForUI -> IO GameStateForUI
-handleEnter oldgs@(GameStateForUI lgs curRow curCol) = do
-  let s = server lgs
-  let newgsui = execPlayerTurn oldgs
-  if newgsui == oldgs then pure newgsui
+handleEnter :: GameStateForPresenter -> IO GameStateForPresenter
+handleEnter (GameStateForPresenter oldgs@(GamePlayState {}) s) = do
+  let newgs = execPlayerTurn oldgs
+  if newgs == oldgs then pure $ GameStateForPresenter oldgs s
   else do
-    case newgsui of
-      EndGameStateForUI {} -> sendGameStateUpdate s (Cell curRow curCol) GameOver >> pure newgsui
-      GameStateForUI {} -> sendGameStateUpdate s (Cell curRow curCol) (turn $ _localGameState newgsui) >> pure newgsui
-      _ -> pure newgsui
+    case newgs of
+      EndGameState {} -> do
+        sendGameStateUpdate s (Cell (_currAttackRow oldgs) (_currAttackCol oldgs)) GameOver
+        pure $ GameStateForPresenter newgs s
+      GamePlayState {} -> do
+        sendGameStateUpdate s (Cell (_currAttackRow oldgs) (_currAttackCol oldgs)) (_turn newgs)
+        pure $ GameStateForPresenter newgs s
+      _ -> pure (GameStateForPresenter newgs s)
 handleEnter gs = pure gs
 
-handleRemoteStatusUpdate :: GameStateForUI -> IO GameStateForUI
-handleRemoteStatusUpdate gsui@(GameStateForUI lgs _ _) = do
-  let s = server lgs
+handleRemoteStatusUpdate :: GameStateForPresenter -> IO GameStateForPresenter
+handleRemoteStatusUpdate gsui@(GameStateForPresenter oldgs@(GamePlayState {}) s) = do
   response <- getGameStateUpdate s
   case response of
     Just (myAttackedCell, turnUpdateFromOpponent) -> do
-        pure $ execOpponentTurn myAttackedCell turnUpdateFromOpponent gsui
+        let newgs = execOpponentTurn myAttackedCell turnUpdateFromOpponent oldgs
+        pure $ GameStateForPresenter newgs s
     Nothing -> pure gsui
 handleRemoteStatusUpdate gs = pure gs
 
 -------------------- APP --------------------
 
-app :: App GameStateForUI RemoteStatusUpdate Name
+app :: App GameStateForPresenter RemoteStatusUpdate Name
 app =
   App
     { appDraw = draw,
@@ -234,5 +215,5 @@ present s isP1 = do
     writeBChan chan RemoteStatusUpdate
     threadDelay 100000
 
-  _ <- customMain initialVty builder (Just chan) app (SetupGameStateForUI [] s 0 0 UIConst.Right 2 isP1 False)
+  _ <- customMain initialVty builder (Just chan) app (GameStateForPresenter (SetupGameState [] 0 0 Types.Right 2 isP1) s)
   putStrLn ""
