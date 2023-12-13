@@ -51,8 +51,10 @@ executable client
     , brick >=1.9
     , microlens >=0.4.13.1
     , microlens-th >=0.4.3.14
+    , mtl >=2.2
     , network >=2.7 && <3.2
     , network-bsd >=2.7 && <2.9
+    , random >=1.2
     , text >=2.0.2
     , vty >=5.38
   default-language: Haskell2010
@@ -87,8 +89,10 @@ executable server
     , brick >=1.9
     , microlens >=0.4.13.1
     , microlens-th >=0.4.3.14
+    , mtl >=2.2
     , network >=2.7 && <3.2
     , network-bsd >=2.7 && <2.9
+    , random >=1.2
     , text >=2.0.2
     , vty >=5.38
   default-language: Haskell2010
@@ -125,8 +129,10 @@ test-suite battleship-test
     , brick >=1.9
     , microlens >=0.4.13.1
     , microlens-th >=0.4.3.14
+    , mtl >=2.2
     , network >=2.7 && <3.2
     , network-bsd >=2.7 && <2.9
+    , random >=1.2
     , text >=2.0.2
     , vty >=5.38
   default-language: Haskell2010

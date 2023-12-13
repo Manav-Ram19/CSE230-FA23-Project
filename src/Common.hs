@@ -18,8 +18,9 @@ getElemAtInd 0 _ l = head l
 getElemAtInd n defaultVal (_ : ls) = getElemAtInd (n - 1) defaultVal ls
 
 contains :: (Eq a) => a -> [a] -> Bool
-contains x = foldr (\ y -> (||) (x == y)) False
+contains = elem 
 
 containsAll :: (Eq a) => [a] -> [a] -> Bool
 containsAll [] _ = True
 containsAll (x:xs) y = contains x y && containsAll xs y
+-- containsAll x y = ((x `intersect` y) == x)
