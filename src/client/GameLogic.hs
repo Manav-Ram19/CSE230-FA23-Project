@@ -1,5 +1,5 @@
 module GameLogic (
-  addShip, execPlayerTurn, getPositionsFromStartDirAndLen, execOpponentTurn, isShipPlacementOutOfBounds, isShipCollidingWithExistingShip, turnDirectionClockWise, turnDirectionAntiClockWise, moveCell, moveSelectedCell
+  addShip, execPlayerTurn, getPositionsFromStartDirAndLen, execOpponentTurn, isShipPlacementOutOfBounds, isShipCollidingWithExistingShip, turnDirectionClockWise, turnDirectionAntiClockWise, moveCell, moveSelectedCell, checkIfPlayerWon, checkForCollision, isCellAttackedBefore
 ) where
 import Types (numRows, numCols, numShipsPerPlayer, Cell (..), Board (..), ClientGameState (..), GameTurn (..), Ship, Direction(..))
 import Common (contains, containsAll)

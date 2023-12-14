@@ -7,11 +7,12 @@ import Test.QuickCheck.Monadic
 import Control.Monad.State
 import System.IO
 import Data.List (intersect)
-import Types (numRows, numCols, Cell(..), Ship, GameTurn (Player1, Player2, GameOver))
-import UIConst (Direction (..), GameStateForUI (..))
+import Types 
+-- import UIConst (Direction (..), GameStateForUI (..))
 import GHC.IO.Handle
 
 import Prelude hiding (Left, Right)
+
 ---------- COMMON ----------
 
 prop_ModifyListAtInd :: Int -> Int -> [Int] -> Bool
@@ -115,33 +116,102 @@ genServerMessageEG = do
 
 ---------- GAME LOGIC ----------
 
--- prop_AddShipSGSUI :: Property
--- prop_AddShipSGSUI = monadicIO $ do
---     -- server <- run $ genIOHandle
---     forAll (genGameStateForUISGSUI)
---     (\oldGS -> (oldGS == oldGS))
---         -- let newGS = addShip oldGS 
---         -- in assert $ newGS == oldGS)
-        
+prop_AddShip_SGSUI :: Property
+prop_AddShip_SGSUI = 
+    forAll genClientGameState_SGSUI
+    (\oldGS@(SetupGameState oSs oR oC oDir oCurShipSize oIsP1) -> 
+        let 
+            newGS@(SetupGameState nSs nR nC nDir nCurShipSize nIsP1) = addShip oldGS
+            newShipPlacement = map (uncurry Cell) (getPositionsFromStartDirAndLen (oR, oC) oCurShipSize oDir)
+        in (
+            (length oSs >= numShipsPerPlayer || isShipPlacementOutOfBounds (oR, oC) oCurShipSize oDir ||
+            foldr (\cell acc -> acc || contains cell (concat oSs)) False newShipPlacement ||
+            ((length nSs) == (length oSs) + 1 && (nCurShipSize == oCurShipSize + 1 || oCurShipSize == 3) && nIsP1 == oIsP1)) &&
+            (not (length oSs >= numShipsPerPlayer || isShipPlacementOutOfBounds (oR, oC) oCurShipSize oDir ||
+            foldr (\cell acc -> acc || contains cell (concat oSs)) False newShipPlacement) ||
+            (newGS == oldGS))
+        ))
 
--- genGameStateForUISGSUI :: Handle -> Gen GameStateForUI
--- genGameStateForUISGSUI = do
---     ships <- genShips
---     server <- run $ genIOHandle
---     row <- elements [0..(numRows-1)]
---     col <- elements [0..(numCols-1)]
---     dir <- genDirection
---     size <- elements [2..5]
---     isP1 <- genBool
---     sent <- genBool
---     return $ SetupGameStateForUI ships server row col dir size isP1 sent
+prop_AddShip_GPS :: Property
+prop_AddShip_GPS = 
+    forAll genClientGameState_GPS
+    (\oldGS -> 
+        let newGS = addShip oldGS
+        in newGS == oldGS)
 
+prop_AddShip_EGS :: Property
+prop_AddShip_EGS = 
+    forAll genClientGameState_EGS
+    (\oldGS -> 
+        let newGS = addShip oldGS
+        in newGS == oldGS)
 
+prop_ExecPlayerTurn_SGSUI :: Property
+prop_ExecPlayerTurn_SGSUI = 
+    forAll genClientGameState_SGSUI
+    (\oldGS -> 
+        let newGS = execPlayerTurn oldGS
+        in newGS == oldGS)
+
+prop_ExecPlayerTurn_GPS :: Property
+prop_ExecPlayerTurn_GPS = 
+    forAll genClientGameState_GPS
+    (\oldGS@(GamePlayState oMyB oOppB oIsP1 oT oR oC) -> 
+        let 
+            newGS = execPlayerTurn oldGS
+            attackCell = Cell oR oC
+            newAttackedCells = attackCell : attackedCells oOppB
+            isGameOver = checkIfPlayerWon newAttackedCells (ships oOppB)
+            isHit = checkForCollision attackCell (ships oOppB) 
+        in (
+            ((isCellAttackedBefore (Cell oR oC) oOppB) && (oldGS == newGS)) || 
+            ((isGameOver || oT == GameOver) && (newGS == EndGameState True || newGS == EndGameState False)) || 
+            (oMyB == _myBoard newGS) && (ships oOppB == ships (_oppBoard newGS)) && 
+            (attackedCells (_oppBoard newGS) == newAttackedCells) && (oIsP1 == _amIP1 newGS) && 
+            ((isHit && (oT == _turn newGS)) || (not isHit && (oT /= _turn newGS)))
+        )
+    )
+
+prop_ExecPlayerTurn_EGS :: Property
+prop_ExecPlayerTurn_EGS = 
+    forAll genClientGameState_EGS
+    (\oldGS -> 
+        let newGS = execPlayerTurn oldGS
+        in newGS == oldGS)
+
+genClientGameState_SGSUI :: Gen ClientGameState
+genClientGameState_SGSUI = do
+    ships <- genShips
+    row <- elements [0..(numRows-1)]
+    col <- elements [0..(numCols-1)]
+    dir <- genDirection
+    size <- elements [2..5]
+    isP1 <- genBool
+    return $ SetupGameState ships row col dir size isP1
+
+genClientGameState_GPS :: Gen ClientGameState
+genClientGameState_GPS = do
+    myB <- genBoard
+    oppB <- genBoard
+    amIP1 <- genBool
+    turn <- genTurn
+    row <- elements [0..(numRows-1)]
+    col <- elements [0..(numCols-1)]
+    return $ GamePlayState myB oppB amIP1 turn row col
+
+genClientGameState_EGS :: Gen ClientGameState
+genClientGameState_EGS = do
+    isWinner <- genBool
+    return $ EndGameState isWinner
 
 ---------- GENERATORS ----------
 
-genIOHandle :: IO Handle
-genIOHandle = openFile "./test/dummyTestFile" ReadMode
+genBoard :: Gen Board
+genBoard = do
+    ships <- genShips
+    n <- choose(0, (numRows-1)*(numCols-1))
+    attackedCells <- replicateM n genCell
+    return $ Board ships attackedCells
 
 genDirection :: Gen Direction
 genDirection = do
@@ -179,14 +249,19 @@ genBool = choose (False, True)
 ---------- RUN TESTS ----------
 main :: IO ()
 main = do
-    quickCheckWith stdArgs { maxSuccess = 10000 } prop_ServerMsgDecServerMsgEncGS
-    quickCheckWith stdArgs { maxSuccess = 10000 } prop_ServerMsgDecServerMsgEncSS
-    quickCheckWith stdArgs { maxSuccess = 10000 } prop_ServerMsgDecServerMsgEncEG
-    quickCheckWith stdArgs { maxSuccess = 10000 } prop_ServerMsgDecServerMsgEncSSU
-    quickCheckWith stdArgs { maxSuccess = 10000 } prop_ClientMsgDecClientMsgEncSS
-    quickCheckWith stdArgs { maxSuccess = 10000 } prop_ClientMsgDecClientMsgEncCSU
-    quickCheckWith stdArgs { maxSuccess = 10000 } prop_ModifyListAtInd
-    quickCheckWith stdArgs { maxSuccess = 10000 } prop_GetElemAtInd
-    quickCheckWith stdArgs { maxSuccess = 10000 } prop_Contains
-    quickCheckWith stdArgs { maxSuccess = 10000 } prop_ContainsAll
+    putStrLn "prop_AddShip_SGSUI"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_AddShip_SGSUI
+    putStrLn "prop_AddShip_GPS"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_AddShip_GPS
+    putStrLn "prop_AddShip_EGS"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_AddShip_EGS
+    putStrLn "prop_ExecPlayerTurn_SGSUI"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_ExecPlayerTurn_SGSUI
+    putStrLn "prop_ExecPlayerTurn_GPS"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_ExecPlayerTurn_GPS
+    putStrLn "prop_ExecPlayerTurn_EGS"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_ServerMsgDecServerMsgEncGS
+    putStrLn "prop_ServerMsgDecServerMsgEncSS"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_ServerMsgDecServerMsgEncSS
+    putStrLn "prop_ServerMsgDecServerMsgEncEG"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_ServerMsgDecServerMsgEncEG
+    putStrLn "prop_ServerMsgDecServerMsgEncSSU"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_ServerMsgDecServerMsgEncSSU
+    putStrLn "prop_ClientMsgDecClientMsgEncSS"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_ClientMsgDecClientMsgEncSS
+    putStrLn "prop_ClientMsgDecClientMsgEncCSU"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_ClientMsgDecClientMsgEncCSU
+    putStrLn "prop_ModifyListAtInd"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_ModifyListAtInd
+    putStrLn "prop_GetElemAtInd"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_GetElemAtInd
+    putStrLn "prop_Contains"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_Contains
+    putStrLn "prop_ContainsAll"; quickCheckWith stdArgs { maxSuccess = 10000 } prop_ContainsAll
     putStrLn "Done"

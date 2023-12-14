@@ -26,7 +26,7 @@ data Cell = Cell {
     col :: Int
  } deriving(Eq, Show, Read)
 
-data Direction = Left | Right | Up | Down deriving (Eq)
+data Direction = Left | Right | Up | Down deriving (Eq, Show)
 
 type Ship = [Cell]
 
@@ -61,7 +61,7 @@ data ClientGameState = SetupGameState {
     _currAttackCol :: Int
   } | EndGameState {
     _isWinner :: Bool
-  } deriving (Eq)
+  } deriving (Eq, Show)
 
 type Port = String
 
