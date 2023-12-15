@@ -7,7 +7,7 @@ import GameLogic
     ( addShip,
       getPositionsFromStartDirAndLen,
       execPlayerTurn,
-      execOpponentTurn, isShipPlacementOutOfBounds, isShipCollidingWithExistingShip, turnDirectionClockWise, turnDirectionAntiClockWise, moveSelectedCell )
+      execOpponentTurn, isShipPlacementOutOfBounds, isShipCollidingWithExistingShip, turnDirectionClockWise, turnDirectionAntiClockWise, moveSelectedCell, isPlayerTurn )
 import Common (modifyListAtInd, getElemAtInd, contains)
 import UIConst (RemoteStatusUpdate (..), Name, myattrApp, GameStateForPresenter (..))
 import UIDraw
@@ -79,7 +79,7 @@ draw (GameStateForPresenter (GamePlayState mb ob isP1 t r c) _) = drawGamePhase 
   where
     myBoard = makePlayerBoard mb
     opBoard = makeOpponentBoard ob
-    isPTurn = isMyTurn isP1 t
+    isPTurn = isPlayerTurn isP1 t
     highlightedCells = [(r, c) | isPTurn]
 
 -------------------- EVENTS -------------------
@@ -139,7 +139,7 @@ handleEventPlayGame (AppEvent RemoteStatusUpdate) = do
   currState <- get
   case currState of
     GameStateForPresenter gs@(GamePlayState {}) _ -> do
-      unless (isMyTurn (_amIP1 gs) (_turn gs)) $ do
+      unless (isPlayerTurn (_amIP1 gs) (_turn gs)) $ do
         uState <- liftIO (handleRemoteStatusUpdate currState)
         put uState
     _ -> pure ()
@@ -147,7 +147,7 @@ handleEventPlayGame e = do
   currState <- get
   case currState of
     GameStateForPresenter gs@(GamePlayState {}) _ -> do
-      when (isMyTurn (_amIP1 gs) (_turn gs)) $ do
+      when (isPlayerTurn (_amIP1 gs) (_turn gs)) $ do
         uState <- liftIO (eventHandler e currState)
         put uState
     _ -> pure ()
@@ -163,11 +163,6 @@ handleEventPlayGame e = do
       pure $ GameStateForPresenter (moveSelectedCell Types.Right gs) server
     eventHandler (VtyEvent (V.EvKey V.KEnter [])) gsp@(GameStateForPresenter (GamePlayState {}) _) = handleEnter gsp
     eventHandler _ gsui = pure gsui
-
-isMyTurn :: Bool -> GameTurn -> Bool
-isMyTurn True Player1 = True
-isMyTurn False Player2 = True
-isMyTurn _ _ = False
 
 handleEnter :: GameStateForPresenter -> IO GameStateForPresenter
 handleEnter (GameStateForPresenter oldgs@(GamePlayState {}) s) = do

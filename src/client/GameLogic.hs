@@ -1,5 +1,5 @@
 module GameLogic (
-  addShip, execPlayerTurn, getPositionsFromStartDirAndLen, execOpponentTurn, isShipPlacementOutOfBounds, isShipCollidingWithExistingShip, turnDirectionClockWise, turnDirectionAntiClockWise, moveCell, moveSelectedCell, checkIfPlayerWon, checkForCollision, isCellAttackedBefore
+  addShip, execPlayerTurn, getPositionsFromStartDirAndLen, execOpponentTurn, isShipPlacementOutOfBounds, isShipCollidingWithExistingShip, turnDirectionClockWise, turnDirectionAntiClockWise, moveCell, moveSelectedCell, checkIfPlayerWon, checkForCollision, isCellAttackedBefore, isPlayerTurn
 ) where
 import Types (numRows, numCols, numShipsPerPlayer, Cell (..), Board (..), ClientGameState (..), GameTurn (..), Ship, Direction(..))
 import Common (contains, containsAll)
@@ -123,6 +123,11 @@ isWinner :: ClientGameState -> Bool
 isWinner (GamePlayState _ opb _ GameOver _ _) = containsAll (concat $ ships opb) (attackedCells opb)
 isWinner (EndGameState isw) = isw
 isWinner _ = False
+
+isPlayerTurn :: Bool -> GameTurn -> Bool
+isPlayerTurn True Player1 = True
+isPlayerTurn False Player2 = True
+isPlayerTurn _ _ = False
 
 turnDirectionClockWise :: Direction -> Direction
 turnDirectionClockWise Types.Left = Types.Up
