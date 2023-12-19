@@ -101,3 +101,29 @@ We had two main challenges until now:
 ## Development Status and Future Work
 
 We expect to be able to support all of our primary features and finish our main goals by the deadline.
+
+## References
+
+- [Network-TicTacToe-Haskell](https://github.com/nikolasburk/Network-TicTacToe-Haskell): We referenced this networked tic tac toe game for two small features of only the client-service infrastructure aspect of our entire architecture: (a) Converting sockets into handles (handles made it easier to write and read data over the network) (b) managing multiple games at the same time (this was a single loc that forks our custom server logic implementation that handles game state replication between clients). The rest of our infrastructure is completely unique for the following reasons:
+    - We use async network calls
+    - Our server and client socket creation code is based on the example listed in the Network.Socket library's wiki: [Network.Socket](https://hackage.haskell.org/package/network-3.1.4.0/docs/Network-Socket.html)
+    - We poll our handles instead of blocking on our handles, due to the specific features of our game, and how it relates to bricks (we discuss this in our presentation).
+    - We have written custom APIs on top of the socket read/write methods for our client/server use cases based on battleships rules
+    - Our Server implementation is responsible for the single role of state replication, but the reference game's server is responsible for input validation and game state manipulation.
+    - Our server doesn't maintain any game state, as seen in our [ServerGameState implementation](https://github.com/Manav-Ram19/CSE230-FA23-Project/blob/main/src/Types.hs) (lines 42-46). On the other hand the reference game's server maintains entire game state, as seen in [Network-TicTacToe-Haskell/TTTServer.hs](https://github.com/nikolasburk/Network-TicTacToe-Haskell/blob/master/TTTServer.hs) (lines 12-17)
+    - The specific lines of code that we referenced are below (the rest of the infrastructure was either built completely by us, or built using the example in the  [Network.Socket](https://hackage.haskell.org/package/network-3.1.4.0/docs/Network-Socket.html) wiki):
+        - Creating Server Handle for Clients:
+            - [Reference](https://github.com/nikolasburk/Network-TicTacToe-Haskell/blob/master/TTTClient.hs) (lines 48-61)
+            - [Our Implementation](https://github.com/Manav-Ram19/CSE230-FA23-Project/blob/main/src/client/ClientNetwork.hs) (lines 74-78)
+        - Creating Client Handles for Server:
+            - [Reference](https://github.com/nikolasburk/Network-TicTacToe-Haskell/blob/master/TTTServer.hs) (lines 43-46 and 50-52)
+            - [Our Implementation](https://github.com/Manav-Ram19/CSE230-FA23-Project/blob/main/src/server/GameServer.hs) (lines 130-132)
+        - Server running each game on a separate thread:
+            - [Reference](https://github.com/nikolasburk/Network-TicTacToe-Haskell/blob/master/TTTServer.hs) (line 57)
+            - [Our Implementation](https://github.com/Manav-Ram19/CSE230-FA23-Project/blob/main/src/server/GameServer.hs) (lines 139)
+- [snake](https://github.com/samtay/snake?tab=readme-ov-file) - We referenced this snake game implementation in haskell to implement a custom event with brick that gets sent out every game tick. Our use-case is unique for the following reasons:
+    - [snake](https://github.com/samtay/snake?tab=readme-ov-file) uses these game ticks to move the snake every game tick. On the other hand, we use this event in our client app to poll the client's socket to check if there is any game state update from the server, as seen in our [Presenter.hs](https://github.com/Manav-Ram19/CSE230-FA23-Project/blob/main/src/client/Presenter.hs) (lines 182-190).
+    - The specific lines of code that we referenced are below:
+        - Creating a custom channel that sends out game events every tick:
+        - [Reference](https://github.com/samtay/snake/blob/master/src/UI.hs) (lines 59-62)
+        - [Our Implementation](https://github.com/Manav-Ram19/CSE230-FA23-Project/blob/main/src/client/Presenter.hs) (lines 208-213)
