@@ -102,6 +102,10 @@ We had two main challenges until now:
 
 We expect to be able to support all of our primary features and finish our main goals by the deadline.
 
+## Presentation
+
+https://www.youtube.com/watch?v=7_Y64MGK-rs
+
 ## References
 
 - [Network-TicTacToe-Haskell](https://github.com/nikolasburk/Network-TicTacToe-Haskell): We referenced this networked tic tac toe game for two small features of only the client-service infrastructure aspect of our entire architecture: (a) Converting sockets into handles (handles made it easier to write and read data over the network) (b) managing multiple games at the same time (this was a single loc that forks our custom server logic implementation that handles game state replication between clients). The rest of our infrastructure is completely unique for the following reasons:
